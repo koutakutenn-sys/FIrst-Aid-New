@@ -6,7 +6,8 @@
   "mixins": [
     "LivingEntityHealthMixin",
     "LivingEntityDamageMixin",
-    "PlayerDimensionsMixin"
+    "PlayerDimensionsMixin",
+    "ProjectileMixin"
   ],
   "client": [
     "client.LivingEntityRendererMixin",

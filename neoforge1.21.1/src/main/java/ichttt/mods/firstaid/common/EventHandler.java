@@ -205,8 +205,31 @@ public class EventHandler {
 
         Entity entity = ((EntityHitResult) result).getEntity();
         if (!entity.level().isClientSide() && entity instanceof Player) {
-            hitList.put((Player) entity, new ProjectileHitContext(event.getEntity(), result.getLocation()));
+            recordProjectileHit((Player) entity, event.getEntity(), result.getLocation());
         }
+    }
+
+    public static void recordProjectileHit(Player player, Entity projectile, Vec3 hitPosition) {
+        hitList.put(player, new ProjectileHitContext(projectile, getProjectileHitPosition(player, projectile, hitPosition)));
+    }
+
+    private static Vec3 getProjectileHitPosition(Player player, Entity projectile, Vec3 fallbackHitPosition) {
+        AABB playerBox = player.getBoundingBox();
+        Vec3 currentPosition = projectile.position();
+        Vec3 previousTickPosition = new Vec3(projectile.xo, projectile.yo, projectile.zo);
+        Optional<Vec3> previousTickHit = playerBox.clip(previousTickPosition, currentPosition);
+        if (previousTickHit.isPresent()) {
+            return previousTickHit.get();
+        }
+
+        Vec3 previousPosition = new Vec3(projectile.xOld, projectile.yOld, projectile.zOld);
+        Optional<Vec3> previousHit = playerBox.clip(previousPosition, currentPosition);
+        if (previousHit.isPresent()) {
+            return previousHit.get();
+        }
+
+        Vec3 nextPosition = currentPosition.add(projectile.getDeltaMovement());
+        return playerBox.clip(currentPosition, nextPosition).orElse(fallbackHitPosition);
     }
 
     private record ProjectileHitContext(Entity projectile, Vec3 hitPosition) {

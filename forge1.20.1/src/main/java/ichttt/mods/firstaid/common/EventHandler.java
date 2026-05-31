@@ -178,8 +178,18 @@ public class EventHandler {
 
         Entity entity = ((EntityHitResult) result).getEntity();
         if (!entity.level().isClientSide && entity instanceof Player) {
-            hitList.put((Player) entity, new ProjectileHitContext(event.getEntity(), result.getLocation()));
+            recordProjectileHit((Player) entity, event.getEntity(), result.getLocation());
         }
+    }
+
+    public static void recordProjectileHit(Player player, Entity projectile, Vec3 hitPosition) {
+        hitList.put(player, new ProjectileHitContext(projectile, getProjectileHitPosition(player, projectile, hitPosition)));
+    }
+
+    private static Vec3 getProjectileHitPosition(Player player, Entity projectile, Vec3 fallbackHitPosition) {
+        Vec3 start = projectile.position();
+        Vec3 end = start.add(projectile.getDeltaMovement());
+        return player.getBoundingBox().clip(start, end).orElse(fallbackHitPosition);
     }
 
     private static IDamageDistributionAlgorithm getForcedDamageDistribution(DamageSource source) {
