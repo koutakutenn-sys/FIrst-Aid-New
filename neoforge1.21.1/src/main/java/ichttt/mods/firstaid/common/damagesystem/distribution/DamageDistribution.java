@@ -63,11 +63,10 @@ public abstract class DamageDistribution implements IDamageDistributionAlgorithm
 
         float left = damageDistribution.distributeDamage(damage, player, source, addStat);
         if (left > 0 && redistributeIfLeft) {
-            boolean hasTriedNoKill = damageDistribution == RandomDamageDistributionAlgorithm.NEAREST_NOKILL || damageDistribution == RandomDamageDistributionAlgorithm.ANY_NOKILL;
-            damageDistribution = hasTriedNoKill ? RandomDamageDistributionAlgorithm.NEAREST_KILL : RandomDamageDistributionAlgorithm.getDefault();
+            boolean hasTriedNoKill = isNoKillRandomDistribution(damageDistribution);
+            damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_KILL;
             left = damageDistribution.distributeDamage(left, player, source, addStat);
             if (left > 0 && !hasTriedNoKill) {
-                damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_KILL;
                 left = damageDistribution.distributeDamage(left, player, source, addStat);
             }
         }
@@ -93,6 +92,10 @@ public abstract class DamageDistribution implements IDamageDistributionAlgorithm
             FirstAid.LOGGER.info(LoggingMarkers.DAMAGE_DISTRIBUTION, "--- DONE! {} still left ---", left);
         }
         return left;
+    }
+
+    private static boolean isNoKillRandomDistribution(IDamageDistributionAlgorithm damageDistribution) {
+        return damageDistribution instanceof RandomDamageDistributionAlgorithm randomDamageDistribution && randomDamageDistribution.isNoKill();
     }
 
     protected float minHealth(@Nonnull Player player, @Nonnull AbstractDamageablePart part) {

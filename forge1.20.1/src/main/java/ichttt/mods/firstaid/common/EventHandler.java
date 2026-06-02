@@ -131,30 +131,47 @@ public class EventHandler {
 
         boolean addStat = amountToDamage < 3.4028235E37F;
         IDamageDistributionAlgorithm damageDistribution = getForcedDamageDistribution(source);
+        boolean hasForcedDamageDistribution = damageDistribution != null;
         if (damageDistribution == null) {
             damageDistribution = FirstAidRegistryLookups.getDamageDistributions(source.type());
         }
 
-        if (source.is(DamageTypeTags.IS_PROJECTILE)) {
+        if (source.is(DamageTypeTags.IS_PROJECTILE) && !hasForcedDamageDistribution) {
             Entity entityProjectile = source.getDirectEntity();
-            ProjectileHitContext projectileHitContext = hitList.remove(player);
-            if (projectileHitContext != null && projectileHitContext.projectile() == entityProjectile) {
-                IDamageDistributionAlgorithm projectileDistribution = PlayerSizeHelper.getProjectileDistribution(player, projectileHitContext.hitPosition());
-                if (projectileDistribution != null) {
-                    damageDistribution = projectileDistribution;
+            if (FirstAid.shouldUseFriendlyRandomDistribution()) {
+                hitList.remove(player);
+                damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_NOKILL;
+            } else {
+                ProjectileHitContext projectileHitContext = hitList.remove(player);
+                if (projectileHitContext != null && projectileHitContext.projectile() == entityProjectile) {
+                    IDamageDistributionAlgorithm projectileDistribution = PlayerSizeHelper.getProjectileDistribution(player, projectileHitContext.hitPosition());
+                    if (projectileDistribution != null) {
+                        damageDistribution = projectileDistribution;
+                    }
                 }
-            }
-            if (damageDistribution == null && entityProjectile != null) {
-                EquipmentSlot slot = PlayerSizeHelper.getSlotTypeForProjectileHit(entityProjectile, player);
-                if (slot != null) {
-                    damageDistribution = new StandardDamageDistributionAlgorithm(Collections.singletonMap(slot, CommonUtils.getPartListForSlot(slot)), false, true);
+                if (damageDistribution == null && entityProjectile != null) {
+                    EquipmentSlot slot = PlayerSizeHelper.getSlotTypeForProjectileHit(entityProjectile, player);
+                    if (slot != null) {
+                        damageDistribution = new StandardDamageDistributionAlgorithm(Collections.singletonMap(slot, CommonUtils.getPartListForSlot(slot)), false, true);
+                    }
+                }
+                if (damageDistribution == null) {
+                    damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_KILL;
                 }
             }
         }
         if (damageDistribution == null) {
             // No given distribution found, and no projectile distribution either. Let's check if we can tell by the source where we should apply the damage, otherwise fall back to random
-            damageDistribution = PlayerSizeHelper.getMeleeDistribution(player, source);
-            if (damageDistribution == null) {
+            if (isMeleeDamageSource(source)) {
+                if (FirstAid.shouldUseFriendlyRandomDistribution()) {
+                    damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_NOKILL;
+                } else {
+                    damageDistribution = PlayerSizeHelper.getMeleeDistribution(player, source);
+                    if (damageDistribution == null) {
+                        damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_KILL;
+                    }
+                }
+            } else {
                 damageDistribution = RandomDamageDistributionAlgorithm.getDefault();
             }
         }
@@ -194,6 +211,11 @@ public class EventHandler {
 
     private static IDamageDistributionAlgorithm getForcedDamageDistribution(DamageSource source) {
         return CommonUtils.isFootOnlyDamageSource(source) ? FOOT_ONLY_DAMAGE_DISTRIBUTION : null;
+    }
+
+    private static boolean isMeleeDamageSource(DamageSource source) {
+        Entity causingEntity = source.getEntity();
+        return causingEntity != null && causingEntity == source.getDirectEntity() && causingEntity instanceof LivingEntity;
     }
 
     private static boolean shouldRedistributeLeftoverDamage(DamageSource source) {
@@ -451,7 +473,7 @@ public class EventHandler {
         FirstAid.lowSuppressionMultiplier = 0.4F;
         FirstAid.morphineActivationDelaySeconds = FirstAid.DEFAULT_MORPHINE_ACTIVATION_DELAY_SECONDS;
         FirstAid.painkillerActivationDelaySeconds = FirstAid.DEFAULT_PAINKILLER_ACTIVATION_DELAY_SECONDS;
-        FirstAid.rescueWakeUpEnabled = false;
+        FirstAid.rescueWakeUpEnabled = true;
         FirstAid.rescueWakeUpDelaySeconds = FirstAid.DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS;
         FirstAid.naturalRegenMode = FirstAid.NaturalRegenMode.LIMITED;
         FirstAid.naturalRegenStrategy = FirstAid.NaturalRegenStrategy.CRITICAL;
@@ -598,6 +620,7 @@ public class EventHandler {
         ), false);
         player.displayClientMessage(buildCommandTipLine(
                 "firstaid.tip.commands.group.advanced",
+                buildCommandTipChip("firstaid.tip.commands.randomdamage.label", "firstaid.tip.commands.randomdamage.detail", "/firstaid randomdamage friendly chance 80", ChatFormatting.GOLD),
                 buildCommandTipChip("firstaid.tip.commands.damagepart.label", "firstaid.tip.commands.damagepart.detail", "/damagePart HEAD 4", ChatFormatting.RED)
         ), false);
     }

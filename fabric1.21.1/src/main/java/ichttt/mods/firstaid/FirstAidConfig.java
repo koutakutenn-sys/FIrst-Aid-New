@@ -104,6 +104,8 @@ public final class FirstAidConfig {
         FirstAid.naturalRegenStrategy = SERVER.naturalRegenStrategy.get();
         FirstAid.naturalRegenLimitRatio = SERVER.naturalRegenLimitRatio.get().floatValue();
         FirstAid.naturalRegenCriticalPriorityRatio = SERVER.naturalRegenCriticalPriorityRatio.get().floatValue();
+        FirstAid.useFriendlyRandomDistribution = SERVER.useFriendlyRandomDistribution.get();
+        FirstAid.friendlyRandomDistributionChance = SERVER.friendlyRandomDistributionChance.get().floatValue();
         FirstAid.medicineEffectMode = SERVER.medicineEffectMode.get();
         FirstAid.medicineTimingMultiplier = SERVER.medicineTimingMultiplier.get().floatValue();
         FirstAid.morphineActivationDelaySeconds = SERVER.morphineActivationDelaySeconds.get();
@@ -132,6 +134,8 @@ public final class FirstAidConfig {
         SERVER.naturalRegenLimitRatio.set((double) FirstAid.naturalRegenLimitRatio);
         SERVER.naturalRegenCriticalPriorityRatio.set((double) FirstAid.naturalRegenCriticalPriorityRatio);
         SERVER.allowNaturalRegeneration.set(FirstAid.naturalRegenMode != FirstAid.NaturalRegenMode.OFF);
+        SERVER.useFriendlyRandomDistribution.set(FirstAid.useFriendlyRandomDistribution);
+        SERVER.friendlyRandomDistributionChance.set((double) FirstAid.clampFriendlyRandomDistributionChance(FirstAid.friendlyRandomDistributionChance));
         SERVER.medicineEffectMode.set(FirstAid.medicineEffectMode);
         SERVER.medicineTimingMultiplier.set((double) FirstAid.medicineTimingMultiplier);
         SERVER.morphineActivationDelaySeconds.set(FirstAid.morphineActivationDelaySeconds);
@@ -249,6 +253,7 @@ public final class FirstAidConfig {
         public final ConfigValue<Boolean> capMaxHealth;
         public final ConfigValue<VanillaHealthCalculationMode> vanillaHealthCalculation;
         public final ConfigValue<Boolean> useFriendlyRandomDistribution;
+        public final ConfigValue<Double> friendlyRandomDistributionChance;
         public final ConfigValue<ArmorEnchantmentMode> armorEnchantmentMode;
 
         public final ConfigValue<Integer> enchantmentMultiplier;
@@ -281,11 +286,11 @@ public final class FirstAidConfig {
         public final ConfigValue<Boolean> commandTipsEnabled;
 
         public Server() {
-            maxHealthHead = define(intValueMinOnly("maxHealthHead", 7, 2));
+            maxHealthHead = define(intValueMinOnly("maxHealthHead", 4, 2));
             maxHealthLeftArm = define(intValueMinOnly("maxHealthLeftArm", 4, 2));
             maxHealthLeftLeg = define(intValueMinOnly("maxHealthLeftLeg", 4, 2));
             maxHealthLeftFoot = define(intValueMinOnly("maxHealthLeftFoot", 4, 2));
-            maxHealthBody = define(intValueMinOnly("maxHealthBody", 11, 2));
+            maxHealthBody = define(intValueMinOnly("maxHealthBody", 6, 2));
             maxHealthRightArm = define(intValueMinOnly("maxHealthRightArm", 4, 2));
             maxHealthRightLeg = define(intValueMinOnly("maxHealthRightLeg", 4, 2));
             maxHealthRightFoot = define(intValueMinOnly("maxHealthRightFoot", 4, 2));
@@ -327,7 +332,8 @@ public final class FirstAidConfig {
             scaleMaxHealth = define(boolValue("scaleMaxHealth", true));
             capMaxHealth = define(boolValue("capMaxHealth", true));
             vanillaHealthCalculation = define(enumValue("vanillaHealthCalculation", VanillaHealthCalculationMode.AVERAGE_ALL, VanillaHealthCalculationMode.class));
-            useFriendlyRandomDistribution = define(boolValue("useFriendlyRandomDistribution", false));
+            useFriendlyRandomDistribution = define(boolValue("useFriendlyRandomDistribution", true));
+            friendlyRandomDistributionChance = define(doubleValue("friendlyRandomDistributionChance", FirstAid.DEFAULT_FRIENDLY_RANDOM_DISTRIBUTION_CHANCE, 0D, 1D));
             armorEnchantmentMode = define(enumValue("armorEnchantmentMode", ArmorEnchantmentMode.LOCAL_ENCHANTMENTS, ArmorEnchantmentMode.class));
 
             enchantmentMultiplier = define(intValue("enchantmentMultiplier", 4, 1, 4));
@@ -341,7 +347,7 @@ public final class FirstAidConfig {
             enablePainVignette = define(boolValue("enablePainVignette", true));
             enablePainFovCompression = define(boolValue("enablePainFovCompression", true));
             enablePainAudioEffects = define(boolValue("enablePainAudioEffects", true));
-            rescueWakeUpEnabled = define(boolValue("rescueWakeUpEnabled", false));
+            rescueWakeUpEnabled = define(boolValue("rescueWakeUpEnabled", true));
             rescueWakeUpDelaySeconds = define(doubleValue("rescueWakeUpDelaySeconds", FirstAid.DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS, 0D, 3600D));
             naturalRegenLimitRatio = define(doubleValue("naturalRegenLimitRatio", 0.85D, 0D, 1D));
             naturalRegenCriticalPriorityRatio = define(doubleValue("naturalRegenCriticalPriorityRatio", 0.85D, 0D, 1D));

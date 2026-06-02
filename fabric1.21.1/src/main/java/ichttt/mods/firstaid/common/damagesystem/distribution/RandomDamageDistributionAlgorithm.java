@@ -21,7 +21,7 @@ package ichttt.mods.firstaid.common.damagesystem.distribution;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import ichttt.mods.firstaid.FirstAidConfig;
+import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.api.damagesystem.AbstractDamageablePart;
 import ichttt.mods.firstaid.api.enums.EnumPlayerPart;
 import ichttt.mods.firstaid.common.util.CommonUtils;
@@ -45,7 +45,7 @@ public class RandomDamageDistributionAlgorithm extends DamageDistribution {
     public static final RandomDamageDistributionAlgorithm ANY_KILL = new RandomDamageDistributionAlgorithm(false, false);
 
     public static RandomDamageDistributionAlgorithm getDefault() {
-        return FirstAidConfig.SERVER.useFriendlyRandomDistribution.get() ? NEAREST_NOKILL : NEAREST_KILL;
+        return FirstAid.shouldUseFriendlyRandomDistribution() ? NEAREST_NOKILL : NEAREST_KILL;
     }
 
     public static RandomDamageDistributionAlgorithm pick(boolean nearestFirst, boolean tryNoKill) {

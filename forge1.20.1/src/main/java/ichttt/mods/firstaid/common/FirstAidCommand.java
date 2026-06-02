@@ -19,6 +19,7 @@
 package ichttt.mods.firstaid.common;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -85,6 +86,14 @@ public final class FirstAidCommand {
                         .then(buildNaturalRegenBranch("limited", FirstAid.NaturalRegenMode.LIMITED))
                         .then(buildNaturalRegenBranch("limited2", FirstAid.NaturalRegenMode.LIMITED2))
                         .then(buildNaturalRegenBranch("full", FirstAid.NaturalRegenMode.FULL)))
+                .then(Commands.literal("randomdamage")
+                        .then(Commands.literal("friendly")
+                                .executes(context -> setFriendlyRandomDistribution(context.getSource(), true))
+                                .then(Commands.literal("chance")
+                                        .then(Commands.argument("percent", DoubleArgumentType.doubleArg(0.0D, 100.0D))
+                                                .executes(context -> setFriendlyRandomDistributionChance(context.getSource(), DoubleArgumentType.getDouble(context, "percent"))))))
+                        .then(Commands.literal("normal")
+                                .executes(context -> setFriendlyRandomDistribution(context.getSource(), false))))
                 .then(Commands.literal("revivewakeup")
                         .then(Commands.literal("on")
                                 .executes(context -> setRescueWakeUp(context.getSource(), true))
@@ -276,6 +285,22 @@ public final class FirstAidCommand {
             case RANDOM -> "firstaid.command.naturalregen.strategy_value.random";
             case CRITICAL -> "firstaid.command.naturalregen.strategy_value.critical";
         };
+    }
+
+    private static int setFriendlyRandomDistribution(CommandSourceStack source, boolean enabled) {
+        FirstAid.useFriendlyRandomDistribution = enabled;
+        FirstAidConfig.persistCommandSettings();
+        source.sendSuccess(() -> Component.translatable(enabled
+                ? "firstaid.command.randomdamage.friendly"
+                : "firstaid.command.randomdamage.normal"), true);
+        return 1;
+    }
+
+    private static int setFriendlyRandomDistributionChance(CommandSourceStack source, double percent) {
+        FirstAid.friendlyRandomDistributionChance = FirstAid.clampFriendlyRandomDistributionChance((float) (percent / 100.0D));
+        FirstAidConfig.persistCommandSettings();
+        source.sendSuccess(() -> Component.translatable("firstaid.command.randomdamage.chance", Math.round(FirstAid.friendlyRandomDistributionChance * 1000.0F) / 10.0F), true);
+        return 1;
     }
 
     private static ResourceLocation parseEntityId(CommandSourceStack source, String input) {

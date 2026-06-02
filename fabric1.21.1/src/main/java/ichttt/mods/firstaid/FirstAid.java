@@ -37,13 +37,15 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class FirstAid {
     public static final String MODID = "firstaid";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
-    public static final double DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS = 20.0D;
+    public static final double DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS = 15.0D;
     public static final double DEFAULT_MORPHINE_ACTIVATION_DELAY_SECONDS = 10.0D;
     public static final double DEFAULT_PAINKILLER_ACTIVATION_DELAY_SECONDS = 30.0D;
+    public static final float DEFAULT_FRIENDLY_RANDOM_DISTRIBUTION_CHANCE = 0.8F;
     private static final ResourceLocation POTION_ENTITY_ID = ResourceLocation.fromNamespaceAndPath("minecraft", "potion");
     private static final ResourceLocation SPLASH_POTION_ENTITY_ID = ResourceLocation.fromNamespaceAndPath("minecraft", "splash_potion");
     private static final ResourceLocation LINGERING_POTION_ENTITY_ID = ResourceLocation.fromNamespaceAndPath("minecraft", "lingering_potion");
@@ -56,12 +58,14 @@ public final class FirstAid {
     public static boolean enablePainVignette = true;
     public static boolean enablePainFovCompression = true;
     public static boolean enablePainAudioEffects = true;
-    public static boolean rescueWakeUpEnabled = false;
+    public static boolean rescueWakeUpEnabled = true;
     public static double rescueWakeUpDelaySeconds = DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS;
     public static NaturalRegenMode naturalRegenMode = NaturalRegenMode.LIMITED;
     public static NaturalRegenStrategy naturalRegenStrategy = NaturalRegenStrategy.CRITICAL;
     public static float naturalRegenLimitRatio = 0.85F;
     public static float naturalRegenCriticalPriorityRatio = 0.85F;
+    public static boolean useFriendlyRandomDistribution = true;
+    public static float friendlyRandomDistributionChance = DEFAULT_FRIENDLY_RANDOM_DISTRIBUTION_CHANCE;
     public static MedicineEffectMode medicineEffectMode = MedicineEffectMode.REALISTIC;
     public static float medicineTimingMultiplier = 1.0F;
     public static double morphineActivationDelaySeconds = DEFAULT_MORPHINE_ACTIVATION_DELAY_SECONDS;
@@ -150,6 +154,15 @@ public final class FirstAid {
 
     public static int getRescueWakeUpDelayTicks() {
         return Math.max(0, (int) Math.round(rescueWakeUpDelaySeconds * 20.0D));
+    }
+
+    public static float clampFriendlyRandomDistributionChance(float chance) {
+        return Math.max(0.0F, Math.min(1.0F, chance));
+    }
+
+    public static boolean shouldUseFriendlyRandomDistribution() {
+        float chance = clampFriendlyRandomDistributionChance(friendlyRandomDistributionChance);
+        return useFriendlyRandomDistribution && chance > 0.0F && (chance >= 1.0F || ThreadLocalRandom.current().nextFloat() < chance);
     }
 
     private FirstAid() {

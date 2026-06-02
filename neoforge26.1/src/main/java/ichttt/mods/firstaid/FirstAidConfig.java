@@ -75,6 +75,8 @@ public class FirstAidConfig {
         FirstAid.naturalRegenStrategy = SERVER.naturalRegenStrategy.get();
         FirstAid.naturalRegenLimitRatio = SERVER.naturalRegenLimitRatio.get().floatValue();
         FirstAid.naturalRegenCriticalPriorityRatio = SERVER.naturalRegenCriticalPriorityRatio.get().floatValue();
+        FirstAid.useFriendlyRandomDistribution = SERVER.useFriendlyRandomDistribution.get();
+        FirstAid.friendlyRandomDistributionChance = SERVER.friendlyRandomDistributionChance.get().floatValue();
         FirstAid.medicineEffectMode = SERVER.medicineEffectMode.get();
         FirstAid.medicineTimingMultiplier = SERVER.medicineTimingMultiplier.get().floatValue();
         FirstAid.injuryDebuffMode = SERVER.injuryDebuffMode.get();
@@ -103,6 +105,8 @@ public class FirstAidConfig {
         SERVER.naturalRegenLimitRatio.set((double) FirstAid.naturalRegenLimitRatio);
         SERVER.naturalRegenCriticalPriorityRatio.set((double) FirstAid.naturalRegenCriticalPriorityRatio);
         SERVER.allowNaturalRegeneration.set(FirstAid.naturalRegenMode != FirstAid.NaturalRegenMode.OFF);
+        SERVER.useFriendlyRandomDistribution.set(FirstAid.useFriendlyRandomDistribution);
+        SERVER.friendlyRandomDistributionChance.set((double) FirstAid.clampFriendlyRandomDistributionChance(FirstAid.friendlyRandomDistributionChance));
         SERVER.medicineEffectMode.set(FirstAid.medicineEffectMode);
         SERVER.medicineTimingMultiplier.set((double) FirstAid.medicineTimingMultiplier);
         SERVER.injuryDebuffMode.set(FirstAid.injuryDebuffMode);
@@ -211,11 +215,11 @@ public class FirstAidConfig {
         Server(ModConfigSpec.Builder builder) {
             builder.comment("Server to Client synced configuration settings").push("Damage System");
 
-            maxHealthHead = healthEntry(builder, "Head", 7);
+            maxHealthHead = healthEntry(builder, "Head", 4);
             maxHealthLeftArm = healthEntry(builder, "Left Arm", 4);
             maxHealthLeftLeg = healthEntry(builder, "Left Leg", 4);
             maxHealthLeftFoot = healthEntry(builder, "Left Foot", 4);
-            maxHealthBody = healthEntry(builder, "Body", 11);
+            maxHealthBody = healthEntry(builder, "Body", 6);
             maxHealthRightArm = healthEntry(builder, "Right Arm", 4);
             maxHealthRightLeg = healthEntry(builder, "Right Leg", 4);
             maxHealthRightFoot = healthEntry(builder, "Right Foot", 4);
@@ -315,9 +319,12 @@ public class FirstAidConfig {
                     .defineEnum("vanillaHealthCalculation", VanillaHealthCalculationMode.AVERAGE_ALL);
 
             useFriendlyRandomDistribution = builder
-                    .comment("If enabled, the default random damage distribution will be changed to leave critical limbs at 1hp if possible.",
-                            "When there is too much damage, the damage will still kill the player. Other distributions that defined are not affected by this.")
-                    .define("useFriendlyRandomDistribution", false);
+                    .comment("If enabled, random damage distributions can leave critical limbs at 1hp if possible.",
+                            "When there is too much damage, the damage will still kill the player. Non-random distributions are not affected by this.")
+                    .define("useFriendlyRandomDistribution", true);
+            friendlyRandomDistributionChance = builder
+                    .comment("Chance for friendly random damage behavior to trigger. 0 disables the protection roll, 1 always applies it when useFriendlyRandomDistribution is enabled.")
+                    .defineInRange("friendlyRandomDistributionChance", FirstAid.DEFAULT_FRIENDLY_RANDOM_DISTRIBUTION_CHANCE, 0D, 1D);
 
             armorEnchantmentMode = builder
                     .comment("If set to LOCAL_ENCHANTMENTS, only the enchantments for the armor for the body part that is currently being damaged is taken into account. The strength of the armor is multiplied by 4 (default value, can be changed by enchantmentMultiplier), so it matches the vanilla default",
@@ -350,7 +357,7 @@ public class FirstAidConfig {
                     .defineInRange("lowSuppressionMultiplier", 0.4D, 0D, 1D);
             rescueWakeUpEnabled = builder
                     .comment("Persistent toggle for /firstaid revivewakeup (on vs off)")
-                    .define("rescueWakeUpEnabled", false);
+                    .define("rescueWakeUpEnabled", true);
             rescueWakeUpDelaySeconds = builder
                     .comment("Persistent delay in seconds for /firstaid revivewakeup on [seconds]")
                     .defineInRange("rescueWakeUpDelaySeconds", FirstAid.DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS, 0D, 3600D);
@@ -483,6 +490,7 @@ public class FirstAidConfig {
         public final ModConfigSpec.BooleanValue capMaxHealth;
         public final ModConfigSpec.EnumValue<VanillaHealthCalculationMode> vanillaHealthCalculation;
         public final ModConfigSpec.BooleanValue useFriendlyRandomDistribution;
+        public final ModConfigSpec.DoubleValue friendlyRandomDistributionChance;
         public final ModConfigSpec.EnumValue<ArmorEnchantmentMode> armorEnchantmentMode;
 
         public final ModConfigSpec.IntValue enchantmentMultiplier;

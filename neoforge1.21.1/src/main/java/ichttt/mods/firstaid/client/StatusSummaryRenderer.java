@@ -26,7 +26,6 @@ import ichttt.mods.firstaid.common.damagesystem.PlayerDamageModel;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.StringUtil;
 import net.minecraft.world.entity.player.Player;
 
 import javax.annotation.Nullable;
@@ -68,39 +67,6 @@ public final class StatusSummaryRenderer {
             lineY += 10;
         }
 
-        if (damageModel.getUnconsciousTicks() > 0) {
-            guiGraphics.drawString(
-                    font,
-                    Component.translatable(
-                            playerDamageModel != null
-                                    ? playerDamageModel.getUnconsciousReasonKey()
-                                    : (damageModel.isCriticalConditionActive() ? "firstaid.gui.critical_condition" : "firstaid.gui.unconscious")
-                    ),
-                    baseX,
-                    lineY,
-                    16766421
-            );
-            lineY += 10;
-            guiGraphics.drawString(
-                    font,
-                    playerDamageModel != null && playerDamageModel.canGiveUp()
-                            ? Component.translatable("firstaid.gui.death_countdown_seconds", playerDamageModel.getUnconsciousSecondsLeft())
-                            : Component.translatable("firstaid.gui.unconscious_left", StringUtil.formatTickDuration(damageModel.getUnconsciousTicks(), 20.0F)),
-                    baseX,
-                    lineY,
-                    16766421
-            );
-            lineY += 10;
-            if (playerDamageModel != null && playerDamageModel.canGiveUp()) {
-                guiGraphics.drawString(font, Component.translatable("firstaid.gui.waiting_for_rescue"), baseX, lineY, 16766421);
-                lineY += 10;
-                guiGraphics.drawString(font, Component.translatable("firstaid.gui.rescue_help"), baseX, lineY, 16766421);
-                lineY += 10;
-                guiGraphics.drawString(font, Component.translatable("firstaid.gui.give_up_hint", ClientHooks.GIVE_UP.getTranslatedKeyMessage()), baseX, lineY, 16757683);
-                lineY += 10;
-            }
-        }
-
         for (MedicineStatusDisplay display : MedicineStatusClientHelper.collect(player)) {
             lineY = MedicineStatusClientHelper.drawStatusLine(guiGraphics, font, display, baseX, lineY);
         }
@@ -112,13 +78,6 @@ public final class StatusSummaryRenderer {
         int count = 0;
         if (damageModel.getPainLevel() > 0) count++;
         if (damageModel.getAdrenalineLevel() > 0) count++;
-        if (damageModel.getUnconsciousTicks() > 0) {
-            count++;
-            count++;
-            if (damageModel instanceof PlayerDamageModel pm && pm.canGiveUp()) {
-                count += 3;
-            }
-        }
         for (MedicineStatusDisplay display : MedicineStatusClientHelper.collect(player)) {
             count++;
         }

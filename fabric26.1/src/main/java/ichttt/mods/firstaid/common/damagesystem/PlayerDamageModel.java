@@ -1044,6 +1044,7 @@ public class PlayerDamageModel extends AbstractPlayerDamageModel implements Look
             this.unconsciousCausesDeath = false;
             if (this.unconsciousReasonKey.equals("firstaid.gui.critical_condition")) {
                this.unconsciousReasonKey = "firstaid.gui.stabilizing";
+               this.refreshRescueWakeUpState(player);
             }
          }
       }

@@ -134,4 +134,5 @@ public class StandardDamageDistributionAlgorithm extends DamageDistribution {
     public Codec<StandardDamageDistributionAlgorithm> codec() {
         return CODEC;
     }
+
 }

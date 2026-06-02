@@ -1038,6 +1038,7 @@ public class PlayerDamageModel extends AbstractPlayerDamageModel implements Look
                 unconsciousCausesDeath = false;
                 if (unconsciousReasonKey.equals(UNCONSCIOUS_REASON_CRITICAL)) {
                     unconsciousReasonKey = UNCONSCIOUS_REASON_RECOVERING;
+                    refreshRescueWakeUpState(player);
                 }
             }
         }

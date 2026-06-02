@@ -64,10 +64,9 @@ public abstract class DamageDistribution implements IDamageDistributionAlgorithm
         float left = damageDistribution.distributeDamage(damage, player, source, addStat);
         if (left > 0 && redistributeIfLeft) {
             boolean hasTriedNoKill = damageDistribution == RandomDamageDistributionAlgorithm.NEAREST_NOKILL || damageDistribution == RandomDamageDistributionAlgorithm.ANY_NOKILL;
-            damageDistribution = hasTriedNoKill ? RandomDamageDistributionAlgorithm.NEAREST_KILL : RandomDamageDistributionAlgorithm.getDefault();
+            damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_KILL;
             left = damageDistribution.distributeDamage(left, player, source, addStat);
             if (left > 0 && !hasTriedNoKill) {
-                damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_KILL;
                 left = damageDistribution.distributeDamage(left, player, source, addStat);
             }
         }

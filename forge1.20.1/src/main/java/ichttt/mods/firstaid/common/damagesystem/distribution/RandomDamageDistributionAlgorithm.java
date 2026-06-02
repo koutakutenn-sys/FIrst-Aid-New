@@ -20,7 +20,7 @@ package ichttt.mods.firstaid.common.damagesystem.distribution;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import ichttt.mods.firstaid.FirstAidConfig;
+import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.api.damagesystem.AbstractDamageablePart;
 import ichttt.mods.firstaid.api.enums.EnumPlayerPart;
 import ichttt.mods.firstaid.common.util.CommonUtils;
@@ -44,7 +44,7 @@ public class RandomDamageDistributionAlgorithm extends DamageDistribution {
     public static final RandomDamageDistributionAlgorithm ANY_KILL = new RandomDamageDistributionAlgorithm(false, false);
 
     public static RandomDamageDistributionAlgorithm getDefault() {
-        return FirstAidConfig.SERVER.useFriendlyRandomDistribution.get() ? NEAREST_NOKILL : NEAREST_KILL;
+        return FirstAid.shouldUseFriendlyRandomDistribution() ? NEAREST_NOKILL : NEAREST_KILL;
     }
 
     public static RandomDamageDistributionAlgorithm pick(boolean nearestFirst, boolean tryNoKill) {
@@ -64,11 +64,21 @@ public class RandomDamageDistributionAlgorithm extends DamageDistribution {
         this.tryNoKill = tryNoKill;
     }
 
+    boolean isNoKill() {
+        return tryNoKill;
+    }
+
     @Override
     protected float minHealth(@Nonnull Player player, @Nonnull AbstractDamageablePart playerPart) {
-        if (tryNoKill && playerPart.canCauseDeath)
+        if (tryNoKill && playerPart.canCauseDeath) {
             return 1F;
+        }
         return 0F;
+    }
+
+    @Override
+    public String toString() {
+        return "RandomDamageDistributionAlgorithm{nearestFirst=" + nearestFirst + ", tryNoKill=" + tryNoKill + '}';
     }
 
     @Override

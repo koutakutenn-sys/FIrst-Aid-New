@@ -81,6 +81,8 @@ public final class FirstAidConfig {
       FirstAid.naturalRegenStrategy = SERVER.naturalRegenStrategy.get();
       FirstAid.naturalRegenLimitRatio = SERVER.naturalRegenLimitRatio.get().floatValue();
       FirstAid.naturalRegenCriticalPriorityRatio = SERVER.naturalRegenCriticalPriorityRatio.get().floatValue();
+      FirstAid.useFriendlyRandomDistribution = SERVER.useFriendlyRandomDistribution.get();
+      FirstAid.friendlyRandomDistributionChance = SERVER.friendlyRandomDistributionChance.get().floatValue();
       FirstAid.medicineEffectMode = SERVER.medicineEffectMode.get();
       FirstAid.medicineTimingMultiplier = SERVER.medicineTimingMultiplier.get().floatValue();
       FirstAid.morphineActivationDelaySeconds = SERVER.morphineActivationDelaySeconds.get();
@@ -109,6 +111,8 @@ public final class FirstAidConfig {
       SERVER.naturalRegenLimitRatio.set((double)FirstAid.naturalRegenLimitRatio);
       SERVER.naturalRegenCriticalPriorityRatio.set((double)FirstAid.naturalRegenCriticalPriorityRatio);
       SERVER.allowNaturalRegeneration.set(FirstAid.naturalRegenMode != FirstAid.NaturalRegenMode.OFF);
+      SERVER.useFriendlyRandomDistribution.set(FirstAid.useFriendlyRandomDistribution);
+      SERVER.friendlyRandomDistributionChance.set((double)FirstAid.clampFriendlyRandomDistributionChance(FirstAid.friendlyRandomDistributionChance));
       SERVER.medicineEffectMode.set(FirstAid.medicineEffectMode);
       SERVER.medicineTimingMultiplier.set((double)FirstAid.medicineTimingMultiplier);
       SERVER.morphineActivationDelaySeconds.set(FirstAid.morphineActivationDelaySeconds);
@@ -472,12 +476,12 @@ public final class FirstAidConfig {
    }
 
    public static final class Server extends FirstAidConfig.ConfigSection {
-      public final FirstAidConfig.ConfigValue<Integer> maxHealthHead = this.define(FirstAidConfig.intValueMinOnly("maxHealthHead", 7, 2));
+      public final FirstAidConfig.ConfigValue<Integer> maxHealthHead = this.define(FirstAidConfig.intValueMinOnly("maxHealthHead", 4, 2));
       public final FirstAidConfig.ConfigValue<Boolean> causeDeathHead;
       public final FirstAidConfig.ConfigValue<Integer> maxHealthLeftArm = this.define(FirstAidConfig.intValueMinOnly("maxHealthLeftArm", 4, 2));
       public final FirstAidConfig.ConfigValue<Integer> maxHealthLeftLeg = this.define(FirstAidConfig.intValueMinOnly("maxHealthLeftLeg", 4, 2));
       public final FirstAidConfig.ConfigValue<Integer> maxHealthLeftFoot = this.define(FirstAidConfig.intValueMinOnly("maxHealthLeftFoot", 4, 2));
-      public final FirstAidConfig.ConfigValue<Integer> maxHealthBody = this.define(FirstAidConfig.intValueMinOnly("maxHealthBody", 11, 2));
+      public final FirstAidConfig.ConfigValue<Integer> maxHealthBody = this.define(FirstAidConfig.intValueMinOnly("maxHealthBody", 6, 2));
       public final FirstAidConfig.ConfigValue<Boolean> causeDeathBody;
       public final FirstAidConfig.ConfigValue<Integer> maxHealthRightArm = this.define(FirstAidConfig.intValueMinOnly("maxHealthRightArm", 4, 2));
       public final FirstAidConfig.ConfigValue<Integer> maxHealthRightLeg = this.define(FirstAidConfig.intValueMinOnly("maxHealthRightLeg", 4, 2));
@@ -512,6 +516,7 @@ public final class FirstAidConfig {
       public final FirstAidConfig.ConfigValue<Boolean> capMaxHealth;
       public final FirstAidConfig.ConfigValue<FirstAidConfig.Server.VanillaHealthCalculationMode> vanillaHealthCalculation;
       public final FirstAidConfig.ConfigValue<Boolean> useFriendlyRandomDistribution;
+      public final FirstAidConfig.ConfigValue<Double> friendlyRandomDistributionChance;
       public final FirstAidConfig.ConfigValue<FirstAidConfig.Server.ArmorEnchantmentMode> armorEnchantmentMode;
       public final FirstAidConfig.ConfigValue<Integer> enchantmentMultiplier;
       public final FirstAidConfig.ConfigValue<List<String>> enchMulOverrideIdentifiers;
@@ -580,7 +585,8 @@ public final class FirstAidConfig {
                FirstAidConfig.Server.VanillaHealthCalculationMode.class
             )
          );
-         this.useFriendlyRandomDistribution = this.define(FirstAidConfig.boolValue("useFriendlyRandomDistribution", false));
+         this.useFriendlyRandomDistribution = this.define(FirstAidConfig.boolValue("useFriendlyRandomDistribution", true));
+         this.friendlyRandomDistributionChance = this.define(FirstAidConfig.doubleValue("friendlyRandomDistributionChance", FirstAid.DEFAULT_FRIENDLY_RANDOM_DISTRIBUTION_CHANCE, 0.0D, 1.0D));
          this.armorEnchantmentMode = this.define(
             FirstAidConfig.enumValue(
                "armorEnchantmentMode", FirstAidConfig.Server.ArmorEnchantmentMode.LOCAL_ENCHANTMENTS, FirstAidConfig.Server.ArmorEnchantmentMode.class
@@ -600,7 +606,7 @@ public final class FirstAidConfig {
          this.enablePainAudioEffects = this.define(FirstAidConfig.boolValue("enablePainAudioEffects", true));
          this.lowSuppressionEnabled = this.define(FirstAidConfig.boolValue("lowSuppressionEnabled", false));
          this.lowSuppressionMultiplier = this.define(FirstAidConfig.doubleValue("lowSuppressionMultiplier", 0.4, 0.0, 1.0));
-         this.rescueWakeUpEnabled = this.define(FirstAidConfig.boolValue("rescueWakeUpEnabled", false));
+         this.rescueWakeUpEnabled = this.define(FirstAidConfig.boolValue("rescueWakeUpEnabled", true));
          this.rescueWakeUpDelaySeconds = this.define(
             FirstAidConfig.doubleValue("rescueWakeUpDelaySeconds", FirstAid.DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS, 0.0, 3600.0)
          );

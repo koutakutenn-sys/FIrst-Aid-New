@@ -73,6 +73,16 @@ This setup keeps the mod readable without flattening its identity:
 - `dynamic`: suppression changes with combat pressure.
 - `mild`: keeps suppression lighter if you want less aggressive visual disruption.
 
+#### Random Damage
+
+```mcfunction
+/firstaid randomdamage friendly chance 80
+/firstaid randomdamage normal
+```
+
+- `friendly chance 80`: default behavior; random damage has an 80% chance to use the friendly no-kill roll for critical body parts when possible.
+- `normal`: uses the original random damage allocation behavior.
+
 #### Medicine Timing
 
 ```mcfunction
@@ -132,7 +142,7 @@ If you want rescue to create a tactical recovery window, start with `on 15` or `
 /firstaid pain dynamic
 /firstaid suppression dynamic
 /firstaid medicineeffect realistic
-/firstaid revivewakeup on 20
+/firstaid revivewakeup on 15
 /firstaid injurydebuff normal
 ```
 

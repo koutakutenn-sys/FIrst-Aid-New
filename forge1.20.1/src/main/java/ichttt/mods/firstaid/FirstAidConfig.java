@@ -70,6 +70,8 @@ public class FirstAidConfig {
         SERVER.naturalRegenLimitRatio.set((double) FirstAid.naturalRegenLimitRatio);
         SERVER.naturalRegenCriticalPriorityRatio.set((double) FirstAid.naturalRegenCriticalPriorityRatio);
         SERVER.allowNaturalRegeneration.set(FirstAid.naturalRegenMode != FirstAid.NaturalRegenMode.OFF);
+        SERVER.useFriendlyRandomDistribution.set(FirstAid.useFriendlyRandomDistribution);
+        SERVER.friendlyRandomDistributionChance.set((double) FirstAid.clampFriendlyRandomDistributionChance(FirstAid.friendlyRandomDistributionChance));
         SERVER.suppressionEntityBlacklist.set(serializeResourceLocationList(FirstAid.suppressionEntityBlacklist));
         serverSpec.save();
     }
@@ -90,6 +92,8 @@ public class FirstAidConfig {
         FirstAid.naturalRegenStrategy = SERVER.naturalRegenStrategy.get();
         FirstAid.naturalRegenLimitRatio = SERVER.naturalRegenLimitRatio.get().floatValue();
         FirstAid.naturalRegenCriticalPriorityRatio = SERVER.naturalRegenCriticalPriorityRatio.get().floatValue();
+        FirstAid.useFriendlyRandomDistribution = SERVER.useFriendlyRandomDistribution.get();
+        FirstAid.friendlyRandomDistributionChance = SERVER.friendlyRandomDistributionChance.get().floatValue();
         FirstAid.setSuppressionEntityBlacklist(parseResourceLocationList(SERVER.suppressionEntityBlacklist.get()));
     }
 
@@ -237,9 +241,12 @@ public class FirstAidConfig {
                     .defineEnum("vanillaHealthCalculation", VanillaHealthCalculationMode.AVERAGE_ALL);
 
             useFriendlyRandomDistribution = builder
-                    .comment("If enabled, the default random damage distribution will be changed to leave critical limbs at 1hp if possible.",
-                            "When there is too much damage, the damage will still kill the player. Other distributions that defined are not affected by this.")
-                    .define("useFriendlyRandomDistribution", false);
+                    .comment("If enabled, random damage distributions can leave critical limbs at 1hp if possible.",
+                            "When there is too much damage, the damage will still kill the player. Non-random distributions are not affected by this.")
+                    .define("useFriendlyRandomDistribution", true);
+            friendlyRandomDistributionChance = builder
+                    .comment("Chance for friendly random damage behavior to trigger. 0 disables the protection roll, 1 always applies it when useFriendlyRandomDistribution is enabled.")
+                    .defineInRange("friendlyRandomDistributionChance", FirstAid.DEFAULT_FRIENDLY_RANDOM_DISTRIBUTION_CHANCE, 0D, 1D);
 
             armorEnchantmentMode = builder
                     .comment("If set to LOCAL_ENCHANTMENTS, only the enchantments for the armor for the body part that is currently being damaged is taken into account. The strength of the armor is multiplied by 4 (default value, can be changed by enchantmentMultiplier), so it matches the vanilla default",
@@ -272,7 +279,7 @@ public class FirstAidConfig {
                     .defineInRange("lowSuppressionMultiplier", 0.4D, 0D, 1D);
             rescueWakeUpEnabled = builder
                     .comment("Persistent toggle for /firstaid revivewakeup (on vs off)")
-                    .define("rescueWakeUpEnabled", false);
+                    .define("rescueWakeUpEnabled", true);
             rescueWakeUpDelaySeconds = builder
                     .comment("Persistent delay in seconds for /firstaid revivewakeup on [seconds]")
                     .defineInRange("rescueWakeUpDelaySeconds", FirstAid.DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS, 0D, 3600D);
@@ -385,6 +392,7 @@ public class FirstAidConfig {
         public final ForgeConfigSpec.BooleanValue capMaxHealth;
         public final ForgeConfigSpec.EnumValue<VanillaHealthCalculationMode> vanillaHealthCalculation;
         public final ForgeConfigSpec.BooleanValue useFriendlyRandomDistribution;
+        public final ForgeConfigSpec.DoubleValue friendlyRandomDistributionChance;
         public final ForgeConfigSpec.EnumValue<ArmorEnchantmentMode> armorEnchantmentMode;
         public final ForgeConfigSpec.BooleanValue dynamicPainEnabled;
         public final ForgeConfigSpec.IntValue mildPainLevel;

@@ -152,31 +152,48 @@ public class EventHandler {
         if (damageModel == null) return false;
         boolean addStat = amountToDamage < 3.4028235E37F;
         IDamageDistributionAlgorithm damageDistribution = getForcedDamageDistribution(source);
+        boolean hasForcedDamageDistribution = damageDistribution != null;
         if (damageDistribution == null) {
             damageDistribution = FirstAidRegistryLookups.getDamageDistributions(source.type());
         }
 
-        if (source.is(DamageTypeTags.IS_PROJECTILE)) {
+        if (source.is(DamageTypeTags.IS_PROJECTILE) && !hasForcedDamageDistribution) {
             Entity directEntity = source.getDirectEntity();
-            ProjectileHitContext projectileHitContext = hitList.remove(player);
-            if (projectileHitContext != null && projectileHitContext.projectile() == directEntity) {
-                IDamageDistributionAlgorithm projectileDistribution = PlayerSizeHelper.getProjectileDistribution(player, projectileHitContext.hitPosition());
-                if (projectileDistribution != null) {
-                    damageDistribution = projectileDistribution;
+            if (FirstAid.shouldUseFriendlyRandomDistribution()) {
+                hitList.remove(player);
+                damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_NOKILL;
+            } else {
+                ProjectileHitContext projectileHitContext = hitList.remove(player);
+                if (projectileHitContext != null && projectileHitContext.projectile() == directEntity) {
+                    IDamageDistributionAlgorithm projectileDistribution = PlayerSizeHelper.getProjectileDistribution(player, projectileHitContext.hitPosition());
+                    if (projectileDistribution != null) {
+                        damageDistribution = projectileDistribution;
+                    }
                 }
-            }
 
-            if (damageDistribution == null && directEntity != null) {
-                EquipmentSlot slot = PlayerSizeHelper.getSlotTypeForProjectileHit(directEntity, player);
-                if (slot != null) {
-                    damageDistribution = new StandardDamageDistributionAlgorithm(Collections.singletonMap(slot, CommonUtils.getPartListForSlot(slot)), false, true);
+                if (damageDistribution == null && directEntity != null) {
+                    EquipmentSlot slot = PlayerSizeHelper.getSlotTypeForProjectileHit(directEntity, player);
+                    if (slot != null) {
+                        damageDistribution = new StandardDamageDistributionAlgorithm(Collections.singletonMap(slot, CommonUtils.getPartListForSlot(slot)), false, true);
+                    }
+                }
+                if (damageDistribution == null) {
+                    damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_KILL;
                 }
             }
         }
         if (damageDistribution == null) {
             // No given distribution found, and no projectile distribution either. Let's check if we can tell by the source where we should apply the damage, otherwise fall back to random
-            damageDistribution = PlayerSizeHelper.getMeleeDistribution(player, source);
-            if (damageDistribution == null) {
+            if (isMeleeDamageSource(source)) {
+                if (FirstAid.shouldUseFriendlyRandomDistribution()) {
+                    damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_NOKILL;
+                } else {
+                    damageDistribution = PlayerSizeHelper.getMeleeDistribution(player, source);
+                    if (damageDistribution == null) {
+                        damageDistribution = RandomDamageDistributionAlgorithm.NEAREST_KILL;
+                    }
+                }
+            } else {
                 damageDistribution = RandomDamageDistributionAlgorithm.getDefault();
             }
         }
@@ -194,6 +211,11 @@ public class EventHandler {
         return CommonUtils.isFootOnlyDamageSource(source) ? FOOT_ONLY_DAMAGE_DISTRIBUTION : null;
     }
 
+    private static boolean isMeleeDamageSource(DamageSource source) {
+        Entity causingEntity = source.getEntity();
+        return causingEntity != null && causingEntity == source.getDirectEntity() && causingEntity instanceof LivingEntity;
+    }
+
     private static boolean shouldRedistributeLeftoverDamage(DamageSource source) {
         return !CommonUtils.isFootOnlyDamageSource(source);
     }
@@ -206,8 +228,31 @@ public class EventHandler {
 
         Entity entity = ((EntityHitResult) result).getEntity();
         if (!entity.level().isClientSide() && entity instanceof Player) {
-            hitList.put((Player) entity, new ProjectileHitContext(event.getEntity(), result.getLocation()));
+            recordProjectileHit((Player) entity, event.getEntity(), result.getLocation());
         }
+    }
+
+    public static void recordProjectileHit(Player player, Entity projectile, Vec3 hitPosition) {
+        hitList.put(player, new ProjectileHitContext(projectile, getProjectileHitPosition(player, projectile, hitPosition)));
+    }
+
+    private static Vec3 getProjectileHitPosition(Player player, Entity projectile, Vec3 fallbackHitPosition) {
+        AABB playerBox = player.getBoundingBox();
+        Vec3 currentPosition = projectile.position();
+        Vec3 previousTickPosition = new Vec3(projectile.xo, projectile.yo, projectile.zo);
+        Optional<Vec3> previousTickHit = playerBox.clip(previousTickPosition, currentPosition);
+        if (previousTickHit.isPresent()) {
+            return previousTickHit.get();
+        }
+
+        Vec3 previousPosition = new Vec3(projectile.xOld, projectile.yOld, projectile.zOld);
+        Optional<Vec3> previousHit = playerBox.clip(previousPosition, currentPosition);
+        if (previousHit.isPresent()) {
+            return previousHit.get();
+        }
+
+        Vec3 nextPosition = currentPosition.add(projectile.getDeltaMovement());
+        return playerBox.clip(currentPosition, nextPosition).orElse(fallbackHitPosition);
     }
 
     private record ProjectileHitContext(Entity projectile, Vec3 hitPosition) {
@@ -452,7 +497,7 @@ public class EventHandler {
         FirstAid.enablePainAudioEffects = true;
         FirstAid.lowSuppressionEnabled = false;
         FirstAid.lowSuppressionMultiplier = 0.4F;
-        FirstAid.rescueWakeUpEnabled = false;
+        FirstAid.rescueWakeUpEnabled = true;
         FirstAid.rescueWakeUpDelaySeconds = FirstAid.DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS;
         FirstAid.morphineActivationDelaySeconds = FirstAid.DEFAULT_MORPHINE_ACTIVATION_DELAY_SECONDS;
         FirstAid.painkillerActivationDelaySeconds = FirstAid.DEFAULT_PAINKILLER_ACTIVATION_DELAY_SECONDS;
@@ -821,6 +866,7 @@ public class EventHandler {
         sendSystemMessage(player, buildCommandTipLine(
                 "firstaid.tip.commands.group.advanced",
                 buildCommandTipChip("firstaid.tip.commands.injurydebuff.label", "firstaid.tip.commands.injurydebuff.detail", "/firstaid injurydebuff normal", ChatFormatting.GOLD),
+                buildCommandTipChip("firstaid.tip.commands.randomdamage.label", "firstaid.tip.commands.randomdamage.detail", "/firstaid randomdamage friendly chance 80", ChatFormatting.GOLD),
                 buildCommandTipChip("firstaid.tip.commands.damagepart.label", "firstaid.tip.commands.damagepart.detail", "/damagePart HEAD 4", ChatFormatting.RED)
         ));
     }
