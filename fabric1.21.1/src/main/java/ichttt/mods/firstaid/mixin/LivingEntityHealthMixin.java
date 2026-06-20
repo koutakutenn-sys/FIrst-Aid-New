@@ -4,9 +4,11 @@ import ichttt.mods.firstaid.FirstAidConfig;
 import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
 import ichttt.mods.firstaid.api.distribution.IDamageDistributionAlgorithm;
 import ichttt.mods.firstaid.common.EventHandler;
+import ichttt.mods.firstaid.common.damagesystem.PlayerDamageModel;
 import ichttt.mods.firstaid.common.damagesystem.distribution.DamageDistribution;
 import ichttt.mods.firstaid.common.damagesystem.distribution.HealthDistribution;
 import ichttt.mods.firstaid.common.damagesystem.distribution.RandomDamageDistributionAlgorithm;
+import ichttt.mods.firstaid.common.network.FirstAidNetworking;
 import ichttt.mods.firstaid.common.util.CommonUtils;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
@@ -61,6 +63,14 @@ public abstract class LivingEntityHealthMixin {
 
         if (health > player.getMaxHealth()) {
             damageModel.forEach(damageablePart -> damageablePart.currentHealth = damageablePart.getMaxHealth());
+            if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+                playerDamageModel.refreshPainState(player);
+            } else {
+                damageModel.scheduleResync();
+            }
+            if (player instanceof ServerPlayer serverPlayer) {
+                FirstAidNetworking.sendDamageModelSync(serverPlayer, damageModel, FirstAidConfig.SERVER.scaleMaxHealth.get());
+            }
             return;
         }
 

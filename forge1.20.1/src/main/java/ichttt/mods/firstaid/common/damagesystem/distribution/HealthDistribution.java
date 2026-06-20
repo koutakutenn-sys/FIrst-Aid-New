@@ -22,6 +22,7 @@ import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.api.damagesystem.AbstractDamageablePart;
 import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
 import ichttt.mods.firstaid.api.enums.EnumPlayerPart;
+import ichttt.mods.firstaid.common.damagesystem.PlayerDamageModel;
 import ichttt.mods.firstaid.common.network.MessageAddHealth;
 import ichttt.mods.firstaid.common.util.CommonUtils;
 import net.minecraft.util.Mth;
@@ -79,6 +80,9 @@ public class HealthDistribution {
         }
 
         if (sendChanges) {
+            if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+                playerDamageModel.refreshPainState(player);
+            }
             ServerPlayer playerMP = (ServerPlayer) player;
             if (playerMP.connection == null || playerMP.connection.connection == null)
                 damageModel.scheduleResync(); //Too early to send changes, keep in mind and do it later
@@ -126,6 +130,9 @@ public class HealthDistribution {
 
         target.heal(healAmount, player, !player.level().isClientSide);
         if (sendChanges) {
+            if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+                playerDamageModel.refreshPainState(player);
+            }
             CommonUtils.syncDamageModel((ServerPlayer) player);
         }
     }

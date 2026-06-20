@@ -22,6 +22,7 @@ import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.FirstAidConfig;
 import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
 import ichttt.mods.firstaid.api.distribution.IDamageDistributionAlgorithm;
+import ichttt.mods.firstaid.common.damagesystem.PlayerDamageModel;
 import ichttt.mods.firstaid.common.damagesystem.distribution.DamageDistribution;
 import ichttt.mods.firstaid.common.damagesystem.distribution.HealthDistribution;
 import ichttt.mods.firstaid.common.damagesystem.distribution.RandomDamageDistributionAlgorithm;
@@ -82,6 +83,14 @@ public class SynchedEntityDataWrapper extends SynchedEntityData {
                     AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(player);
                     if (damageModel != null) {
                         damageModel.forEach(damageablePart -> damageablePart.currentHealth = damageablePart.getMaxHealth());
+                        if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+                            playerDamageModel.refreshPainState(player);
+                        } else {
+                            damageModel.scheduleResync();
+                        }
+                        if (player instanceof ServerPlayer serverPlayer) {
+                            CommonUtils.syncDamageModel(serverPlayer);
+                        }
                     }
                 } else if (beingRevived) {
                     if (FirstAidConfig.GENERAL.debug.get())

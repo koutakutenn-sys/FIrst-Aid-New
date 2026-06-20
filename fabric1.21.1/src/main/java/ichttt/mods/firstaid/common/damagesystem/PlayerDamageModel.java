@@ -303,6 +303,7 @@ public class PlayerDamageModel extends AbstractPlayerDamageModel implements Look
         if (!painSuppressed && !world.isClientSide())
             sharedDebuffs.forEach(sharedDebuff -> sharedDebuff.tick(player));
         if (healingStateChanged && player instanceof ServerPlayer serverPlayer) {
+            painLevel = calculatePainLevel();
             FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
         }
     }

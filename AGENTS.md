@@ -1,15 +1,15 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository is a multi-loader port of the First Aid mod. Each top-level loader/version directory is its own Gradle project: `fabric1.21.1/`, `fabric26.1/`, `neoforge1.21.1/`, `neoforge26.1/`, and `forge1.20.1/`. The `fabric1.21.11` and `neoforge1.21.11` code lines have been renamed to `fabric1.21.11-legacy/` and `neoforge1.21.11-legacy/`; treat them as legacy-only and do not actively maintain them unless the task explicitly says legacy. Java sources live under `src/main/java` and client-only code usually lives in `src/client/java` on Fabric. Assets, recipes, mixins, and mod metadata live in `src/main/resources`. Generated data, when used, is written to `src/generated/resources`. Root-level `screenshots/` and `README.md` are documentation assets, not runtime content.
+This repository is a multi-loader port of the First Aid mod. Each top-level loader/version directory is its own Gradle project: `fabric1.21.1/`, `fabric26.1/`, `neoforge1.21.1/`, `neoforge26.1/`, `neoforge26.2/`, and `forge1.20.1/`. The `fabric1.21.11` and `neoforge1.21.11` code lines have been renamed to `fabric1.21.11-legacy/` and `neoforge1.21.11-legacy/`; treat them as legacy-only and do not actively maintain them unless the task explicitly says legacy. Java sources live under `src/main/java` and client-only code usually lives in `src/client/java` on Fabric. Assets, recipes, mixins, and mod metadata live in `src/main/resources`. Generated data, when used, is written to `src/generated/resources`. Root-level `screenshots/` and `README.md` are documentation assets, not runtime content.
 
 ## Build, Test, and Development Commands
 Run commands from the specific module you are changing; there is no root Gradle build.
 
 - `cd fabric1.21.11 && .\gradlew.bat build` builds the Fabric 1.21.11 jar.
-- `cd neoforge1.21.11 && .\gradlew.bat build` builds the NeoForge 1.21.11 jar.
-- `cd neoforge1.21.11 && .\gradlew.bat runClient` launches a local client dev instance.
-- `cd neoforge1.21.11 && .\gradlew.bat runGameTestServer` runs registered GameTests, if present.
+- `cd neoforge26.2 && .\gradlew.bat build` builds the NeoForge 26.2 jar.
+- `cd neoforge26.2 && .\gradlew.bat runClient` launches a local client dev instance.
+- `cd neoforge26.2 && .\gradlew.bat runGameTestServer` runs registered GameTests, if present.
 - `cd forge1.20.1 && .\gradlew.bat runServer` starts the Forge server dev environment.
 
 Use the module's wrapper instead of a system Gradle install.

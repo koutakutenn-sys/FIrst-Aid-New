@@ -22,6 +22,7 @@ import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.api.damagesystem.AbstractDamageablePart;
 import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
 import ichttt.mods.firstaid.api.enums.EnumPlayerPart;
+import ichttt.mods.firstaid.common.damagesystem.PlayerDamageModel;
 import ichttt.mods.firstaid.common.util.CommonUtils;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -84,6 +85,9 @@ public class HealthDistribution {
         }
 
         if (sendChanges) {
+            if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+                playerDamageModel.refreshPainState(player);
+            }
             CommonUtils.syncDamageModel((ServerPlayer) player);
         }
     }
@@ -131,6 +135,9 @@ public class HealthDistribution {
 
         target.heal(healAmount, player, !player.level().isClientSide());
         if (sendChanges) {
+            if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+                playerDamageModel.refreshPainState(player);
+            }
             CommonUtils.syncDamageModel((ServerPlayer) player);
         }
     }
