@@ -496,6 +496,7 @@ public class EventHandler {
         FirstAid.enablePainFovCompression = true;
         FirstAid.enablePainAudioEffects = true;
         FirstAid.lowSuppressionEnabled = false;
+        FirstAid.projectileSuppressionEnabled = true;
         FirstAid.lowSuppressionMultiplier = 0.4F;
         FirstAid.rescueWakeUpEnabled = true;
         FirstAid.rescueWakeUpDelaySeconds = FirstAid.DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS;
@@ -542,6 +543,10 @@ public class EventHandler {
     }
 
     private static float getNearbyProjectileStrength(Player player) {
+        if (!FirstAid.projectileSuppressionEnabled) {
+            return 0.0F;
+        }
+
         AABB scanBox = player.getBoundingBox().inflate(3.25D);
         AABB playerBox = player.getBoundingBox().inflate(0.12D);
         Vec3 eyePosition = player.getEyePosition();

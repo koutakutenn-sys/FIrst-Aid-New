@@ -54,6 +54,7 @@ public final class FirstAid {
     public static boolean dynamicPainEnabled = false;
     public static int mildPainLevel = 1;
     public static boolean lowSuppressionEnabled = false;
+    public static boolean projectileSuppressionEnabled = true;
     public static float lowSuppressionMultiplier = 0.4F;
     public static boolean enablePainVignette = true;
     public static boolean enablePainFovCompression = true;

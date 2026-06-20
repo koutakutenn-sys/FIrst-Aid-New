@@ -71,6 +71,8 @@ public final class FirstAidCommand {
                                 .executes(context -> setLowSuppression(context.getSource(), false)))
                         .then(Commands.literal("mild")
                                 .executes(context -> setLowSuppression(context.getSource(), true)))
+                        .then(Commands.literal("off")
+                                .executes(context -> setProjectileSuppression(context.getSource(), false)))
                         .then(Commands.literal("blacklist")
                                 .then(Commands.literal("add")
                                         .then(Commands.argument("entity", StringArgumentType.greedyString())
@@ -153,11 +155,21 @@ public final class FirstAidCommand {
     }
 
     private static int setLowSuppression(CommandSourceStack source, boolean enabled) {
+        FirstAid.projectileSuppressionEnabled = true;
         FirstAid.lowSuppressionEnabled = enabled;
         source.sendSuccess(() -> Component.translatable(enabled
                 ? "firstaid.command.suppression.mild"
                 : "firstaid.command.suppression.dynamic"), true);
         FirstAidConfig.persistCommandSettings();
+        syncCommandSettings(source);
+        return 1;
+    }
+
+    private static int setProjectileSuppression(CommandSourceStack source, boolean enabled) {
+        FirstAid.projectileSuppressionEnabled = enabled;
+        source.sendSuccess(() -> Component.translatable("firstaid.command.suppression.off"), true);
+        FirstAidConfig.persistCommandSettings();
+        syncCommandSettings(source);
         return 1;
     }
 

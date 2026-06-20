@@ -94,6 +94,7 @@ public final class FirstAidConfig {
         FirstAid.dynamicPainEnabled = SERVER.dynamicPainEnabled.get();
         FirstAid.mildPainLevel = SERVER.mildPainLevel.get();
         FirstAid.lowSuppressionEnabled = SERVER.lowSuppressionEnabled.get();
+        FirstAid.projectileSuppressionEnabled = SERVER.projectileSuppressionEnabled.get();
         FirstAid.lowSuppressionMultiplier = SERVER.lowSuppressionMultiplier.get().floatValue();
         FirstAid.enablePainVignette = SERVER.enablePainVignette.get();
         FirstAid.enablePainFovCompression = SERVER.enablePainFovCompression.get();
@@ -123,6 +124,7 @@ public final class FirstAidConfig {
         SERVER.dynamicPainEnabled.set(FirstAid.dynamicPainEnabled);
         SERVER.mildPainLevel.set(FirstAid.mildPainLevel);
         SERVER.lowSuppressionEnabled.set(FirstAid.lowSuppressionEnabled);
+        SERVER.projectileSuppressionEnabled.set(FirstAid.projectileSuppressionEnabled);
         SERVER.lowSuppressionMultiplier.set((double) FirstAid.lowSuppressionMultiplier);
         SERVER.enablePainVignette.set(FirstAid.enablePainVignette);
         SERVER.enablePainFovCompression.set(FirstAid.enablePainFovCompression);
@@ -262,6 +264,7 @@ public final class FirstAidConfig {
         public final ConfigValue<Boolean> dynamicPainEnabled;
         public final ConfigValue<Integer> mildPainLevel;
         public final ConfigValue<Boolean> lowSuppressionEnabled;
+        public final ConfigValue<Boolean> projectileSuppressionEnabled;
         public final ConfigValue<Double> lowSuppressionMultiplier;
         public final ConfigValue<Boolean> enablePainVignette;
         public final ConfigValue<Boolean> enablePainFovCompression;
@@ -343,6 +346,7 @@ public final class FirstAidConfig {
             dynamicPainEnabled = define(boolValue("dynamicPainEnabled", false));
             mildPainLevel = define(intValue("mildPainLevel", 1, 1, 5));
             lowSuppressionEnabled = define(boolValue("lowSuppressionEnabled", false));
+            projectileSuppressionEnabled = define(boolValue("projectileSuppressionEnabled", true));
             lowSuppressionMultiplier = define(doubleValue("lowSuppressionMultiplier", 0.4D, 0D, 1D));
             enablePainVignette = define(boolValue("enablePainVignette", true));
             enablePainFovCompression = define(boolValue("enablePainFovCompression", true));

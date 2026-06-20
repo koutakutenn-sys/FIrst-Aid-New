@@ -32,17 +32,19 @@ public class MessageSyncCommandSettings {
     private final boolean enablePainVignette;
     private final boolean enablePainFovCompression;
     private final boolean enablePainAudioEffects;
+    private final boolean projectileSuppressionEnabled;
     private final String suppressionEntityBlacklist;
 
-    private MessageSyncCommandSettings(boolean enablePainVignette, boolean enablePainFovCompression, boolean enablePainAudioEffects, String suppressionEntityBlacklist) {
+    private MessageSyncCommandSettings(boolean enablePainVignette, boolean enablePainFovCompression, boolean enablePainAudioEffects, boolean projectileSuppressionEnabled, String suppressionEntityBlacklist) {
         this.enablePainVignette = enablePainVignette;
         this.enablePainFovCompression = enablePainFovCompression;
         this.enablePainAudioEffects = enablePainAudioEffects;
+        this.projectileSuppressionEnabled = projectileSuppressionEnabled;
         this.suppressionEntityBlacklist = suppressionEntityBlacklist;
     }
 
     public MessageSyncCommandSettings(FriendlyByteBuf buffer) {
-        this(buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readUtf(32767));
+        this(buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readUtf(32767));
     }
 
     public static MessageSyncCommandSettings current() {
@@ -57,6 +59,7 @@ public class MessageSyncCommandSettings {
                 FirstAid.enablePainVignette,
                 FirstAid.enablePainFovCompression,
                 FirstAid.enablePainAudioEffects,
+                FirstAid.projectileSuppressionEnabled,
                 builder.toString());
     }
 
@@ -64,6 +67,7 @@ public class MessageSyncCommandSettings {
         buf.writeBoolean(enablePainVignette);
         buf.writeBoolean(enablePainFovCompression);
         buf.writeBoolean(enablePainAudioEffects);
+        buf.writeBoolean(projectileSuppressionEnabled);
         buf.writeUtf(suppressionEntityBlacklist, 32767);
     }
 
@@ -75,6 +79,7 @@ public class MessageSyncCommandSettings {
                 FirstAid.enablePainVignette = message.enablePainVignette;
                 FirstAid.enablePainFovCompression = message.enablePainFovCompression;
                 FirstAid.enablePainAudioEffects = message.enablePainAudioEffects;
+                FirstAid.projectileSuppressionEnabled = message.projectileSuppressionEnabled;
                 FirstAid.setSuppressionEntityBlacklist(parseList(message.suppressionEntityBlacklist));
             });
         }

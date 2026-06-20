@@ -38,7 +38,7 @@ public final class ProjectileNearMissDetector {
    public void tick(Minecraft client) {
       Player player = client.player;
       Level level = client.level;
-      if (player != null && level != null && player.isAlive() && !player.isSpectator() && FirstAid.isSynced) {
+      if (player != null && level != null && player.isAlive() && !player.isSpectator() && FirstAid.isSynced && FirstAid.projectileSuppressionEnabled) {
          if (this.trackedLevel != level) {
             this.trackedProjectiles.clear();
             this.trackedLevel = level;
@@ -65,6 +65,7 @@ public final class ProjectileNearMissDetector {
 
          this.cleanup(seenIds, gameTime);
       } else {
+         this.trackedProjectiles.clear();
          this.clearIfLevelChanged(level);
       }
    }

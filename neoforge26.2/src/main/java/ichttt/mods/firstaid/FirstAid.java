@@ -66,6 +66,7 @@ public class FirstAid {
     public static boolean enablePainFovCompression = true;
     public static boolean enablePainAudioEffects = true;
     public static boolean lowSuppressionEnabled = false;
+    public static boolean projectileSuppressionEnabled = true;
     public static float lowSuppressionMultiplier = 0.4F;
     public static boolean rescueWakeUpEnabled = true;
     public static double rescueWakeUpDelaySeconds = DEFAULT_RESCUE_WAKE_UP_DELAY_SECONDS;

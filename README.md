@@ -68,10 +68,12 @@ This setup keeps the mod readable without flattening its identity:
 ```mcfunction
 /firstaid suppression dynamic
 /firstaid suppression mild
+/firstaid suppression off
 ```
 
 - `dynamic`: suppression changes with combat pressure.
 - `mild`: keeps suppression lighter if you want less aggressive visual disruption.
+- `off`: disables projectile near-miss suppression triggers.
 
 #### Random Damage
 

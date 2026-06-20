@@ -38,6 +38,8 @@ public class MessageSyncCommandSettings implements CustomPacketPayload {
             message -> message.enablePainFovCompression,
             ByteBufCodecs.BOOL,
             message -> message.enablePainAudioEffects,
+            ByteBufCodecs.BOOL,
+            message -> message.projectileSuppressionEnabled,
             ByteBufCodecs.stringUtf8(32767),
             message -> message.suppressionEntityBlacklist,
             MessageSyncCommandSettings::new);
@@ -45,12 +47,14 @@ public class MessageSyncCommandSettings implements CustomPacketPayload {
     private final boolean enablePainVignette;
     private final boolean enablePainFovCompression;
     private final boolean enablePainAudioEffects;
+    private final boolean projectileSuppressionEnabled;
     private final String suppressionEntityBlacklist;
 
-    private MessageSyncCommandSettings(boolean enablePainVignette, boolean enablePainFovCompression, boolean enablePainAudioEffects, String suppressionEntityBlacklist) {
+    private MessageSyncCommandSettings(boolean enablePainVignette, boolean enablePainFovCompression, boolean enablePainAudioEffects, boolean projectileSuppressionEnabled, String suppressionEntityBlacklist) {
         this.enablePainVignette = enablePainVignette;
         this.enablePainFovCompression = enablePainFovCompression;
         this.enablePainAudioEffects = enablePainAudioEffects;
+        this.projectileSuppressionEnabled = projectileSuppressionEnabled;
         this.suppressionEntityBlacklist = suppressionEntityBlacklist;
     }
 
@@ -66,6 +70,7 @@ public class MessageSyncCommandSettings implements CustomPacketPayload {
                 FirstAid.enablePainVignette,
                 FirstAid.enablePainFovCompression,
                 FirstAid.enablePainAudioEffects,
+                FirstAid.projectileSuppressionEnabled,
                 builder.toString());
     }
 
@@ -79,6 +84,7 @@ public class MessageSyncCommandSettings implements CustomPacketPayload {
             FirstAid.enablePainVignette = message.enablePainVignette;
             FirstAid.enablePainFovCompression = message.enablePainFovCompression;
             FirstAid.enablePainAudioEffects = message.enablePainAudioEffects;
+            FirstAid.projectileSuppressionEnabled = message.projectileSuppressionEnabled;
             FirstAid.setSuppressionEntityBlacklist(parseList(message.suppressionEntityBlacklist));
         });
     }

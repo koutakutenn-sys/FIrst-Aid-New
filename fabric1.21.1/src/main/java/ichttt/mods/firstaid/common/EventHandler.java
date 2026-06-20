@@ -473,6 +473,7 @@ public final class EventHandler {
         FirstAid.dynamicPainEnabled = false;
         FirstAid.mildPainLevel = 1;
         FirstAid.lowSuppressionEnabled = false;
+        FirstAid.projectileSuppressionEnabled = true;
         FirstAid.lowSuppressionMultiplier = 0.4F;
         FirstAid.enablePainVignette = true;
         FirstAid.enablePainFovCompression = true;
@@ -501,6 +502,10 @@ public final class EventHandler {
     }
 
     private static float getNearbyProjectileStrength(Player player) {
+        if (!FirstAid.projectileSuppressionEnabled) {
+            return 0.0F;
+        }
+
         AABB scanBox = player.getBoundingBox().inflate(3.25D);
         AABB playerBox = player.getBoundingBox().inflate(0.12D);
         Vec3 eyePosition = player.getEyePosition();

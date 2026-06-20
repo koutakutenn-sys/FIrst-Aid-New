@@ -74,6 +74,7 @@ public final class FirstAidConfig {
       FirstAid.enablePainFovCompression = SERVER.enablePainFovCompression.get();
       FirstAid.enablePainAudioEffects = SERVER.enablePainAudioEffects.get();
       FirstAid.lowSuppressionEnabled = SERVER.lowSuppressionEnabled.get();
+      FirstAid.projectileSuppressionEnabled = SERVER.projectileSuppressionEnabled.get();
       FirstAid.lowSuppressionMultiplier = SERVER.lowSuppressionMultiplier.get().floatValue();
       FirstAid.rescueWakeUpEnabled = SERVER.rescueWakeUpEnabled.get();
       FirstAid.rescueWakeUpDelaySeconds = SERVER.rescueWakeUpDelaySeconds.get();
@@ -103,6 +104,7 @@ public final class FirstAidConfig {
       SERVER.enablePainFovCompression.set(FirstAid.enablePainFovCompression);
       SERVER.enablePainAudioEffects.set(FirstAid.enablePainAudioEffects);
       SERVER.lowSuppressionEnabled.set(FirstAid.lowSuppressionEnabled);
+      SERVER.projectileSuppressionEnabled.set(FirstAid.projectileSuppressionEnabled);
       SERVER.lowSuppressionMultiplier.set((double)FirstAid.lowSuppressionMultiplier);
       SERVER.rescueWakeUpEnabled.set(FirstAid.rescueWakeUpEnabled);
       SERVER.rescueWakeUpDelaySeconds.set(FirstAid.rescueWakeUpDelaySeconds);
@@ -527,6 +529,7 @@ public final class FirstAidConfig {
       public final FirstAidConfig.ConfigValue<Boolean> enablePainFovCompression;
       public final FirstAidConfig.ConfigValue<Boolean> enablePainAudioEffects;
       public final FirstAidConfig.ConfigValue<Boolean> lowSuppressionEnabled;
+      public final FirstAidConfig.ConfigValue<Boolean> projectileSuppressionEnabled;
       public final FirstAidConfig.ConfigValue<Double> lowSuppressionMultiplier;
       public final FirstAidConfig.ConfigValue<Boolean> rescueWakeUpEnabled;
       public final FirstAidConfig.ConfigValue<Double> rescueWakeUpDelaySeconds;
@@ -605,6 +608,7 @@ public final class FirstAidConfig {
          this.enablePainFovCompression = this.define(FirstAidConfig.boolValue("enablePainFovCompression", true));
          this.enablePainAudioEffects = this.define(FirstAidConfig.boolValue("enablePainAudioEffects", true));
          this.lowSuppressionEnabled = this.define(FirstAidConfig.boolValue("lowSuppressionEnabled", false));
+         this.projectileSuppressionEnabled = this.define(FirstAidConfig.boolValue("projectileSuppressionEnabled", true));
          this.lowSuppressionMultiplier = this.define(FirstAidConfig.doubleValue("lowSuppressionMultiplier", 0.4, 0.0, 1.0));
          this.rescueWakeUpEnabled = this.define(FirstAidConfig.boolValue("rescueWakeUpEnabled", true));
          this.rescueWakeUpDelaySeconds = this.define(

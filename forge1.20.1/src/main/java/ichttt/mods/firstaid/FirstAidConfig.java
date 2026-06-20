@@ -60,6 +60,7 @@ public class FirstAidConfig {
         SERVER.enablePainFovCompression.set(FirstAid.enablePainFovCompression);
         SERVER.enablePainAudioEffects.set(FirstAid.enablePainAudioEffects);
         SERVER.lowSuppressionEnabled.set(FirstAid.lowSuppressionEnabled);
+        SERVER.projectileSuppressionEnabled.set(FirstAid.projectileSuppressionEnabled);
         SERVER.lowSuppressionMultiplier.set((double) FirstAid.lowSuppressionMultiplier);
         SERVER.rescueWakeUpEnabled.set(FirstAid.rescueWakeUpEnabled);
         SERVER.rescueWakeUpDelaySeconds.set(FirstAid.rescueWakeUpDelaySeconds);
@@ -83,6 +84,7 @@ public class FirstAidConfig {
         FirstAid.enablePainFovCompression = SERVER.enablePainFovCompression.get();
         FirstAid.enablePainAudioEffects = SERVER.enablePainAudioEffects.get();
         FirstAid.lowSuppressionEnabled = SERVER.lowSuppressionEnabled.get();
+        FirstAid.projectileSuppressionEnabled = SERVER.projectileSuppressionEnabled.get();
         FirstAid.lowSuppressionMultiplier = SERVER.lowSuppressionMultiplier.get().floatValue();
         FirstAid.rescueWakeUpEnabled = SERVER.rescueWakeUpEnabled.get();
         FirstAid.rescueWakeUpDelaySeconds = SERVER.rescueWakeUpDelaySeconds.get();
@@ -274,6 +276,9 @@ public class FirstAidConfig {
             lowSuppressionEnabled = builder
                     .comment("Persistent toggle for /firstaid suppression (dynamic vs mild)")
                     .define("lowSuppressionEnabled", false);
+            projectileSuppressionEnabled = builder
+                    .comment("Persistent toggle for projectile near-miss suppression")
+                    .define("projectileSuppressionEnabled", true);
             lowSuppressionMultiplier = builder
                     .comment("Visual suppression intensity multiplier used when /firstaid suppression mild is active")
                     .defineInRange("lowSuppressionMultiplier", 0.4D, 0D, 1D);
@@ -400,6 +405,7 @@ public class FirstAidConfig {
         public final ForgeConfigSpec.BooleanValue enablePainFovCompression;
         public final ForgeConfigSpec.BooleanValue enablePainAudioEffects;
         public final ForgeConfigSpec.BooleanValue lowSuppressionEnabled;
+        public final ForgeConfigSpec.BooleanValue projectileSuppressionEnabled;
         public final ForgeConfigSpec.DoubleValue lowSuppressionMultiplier;
         public final ForgeConfigSpec.BooleanValue rescueWakeUpEnabled;
         public final ForgeConfigSpec.DoubleValue rescueWakeUpDelaySeconds;
