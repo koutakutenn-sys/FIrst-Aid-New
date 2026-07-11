@@ -21,37 +21,26 @@ package ichttt.mods.firstaid.client.gui;
 import ichttt.mods.firstaid.FirstAidConfig;
 import ichttt.mods.firstaid.api.damagesystem.AbstractDamageablePart;
 import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
+import ichttt.mods.firstaid.client.util.HeartSpriteHelper;
 import ichttt.mods.firstaid.client.util.HealthRenderUtils;
 import ichttt.mods.firstaid.common.util.CommonUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 
 public final class FirstaidIngameGui {
-    private static final ResourceLocation HEART_CONTAINER_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/container");
-    private static final ResourceLocation HEART_CONTAINER_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/container_blinking");
-    private static final ResourceLocation HEART_FULL_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/full");
-    private static final ResourceLocation HEART_FULL_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/full_blinking");
-    private static final ResourceLocation HEART_HALF_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/half");
-    private static final ResourceLocation HEART_HALF_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/half_blinking");
-    private static final ResourceLocation HEART_POISONED_FULL_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/poisoned_full");
-    private static final ResourceLocation HEART_POISONED_FULL_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/poisoned_full_blinking");
-    private static final ResourceLocation HEART_POISONED_HALF_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/poisoned_half");
-    private static final ResourceLocation HEART_POISONED_HALF_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/poisoned_half_blinking");
-    private static final ResourceLocation HEART_WITHERED_FULL_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/withered_full");
-    private static final ResourceLocation HEART_WITHERED_FULL_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/withered_full_blinking");
-    private static final ResourceLocation HEART_WITHERED_HALF_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/withered_half");
-    private static final ResourceLocation HEART_WITHERED_HALF_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/withered_half_blinking");
-    private static final ResourceLocation HEART_ABSORBING_FULL_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/absorbing_full");
-    private static final ResourceLocation HEART_ABSORBING_FULL_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/absorbing_full_blinking");
-    private static final ResourceLocation HEART_ABSORBING_HALF_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/absorbing_half");
-    private static final ResourceLocation HEART_ABSORBING_HALF_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/absorbing_half_blinking");
+    private static int lastHealth = -1;
+    private static int blinkUntilTick;
+    private static Player lastPlayer;
+    private static Level lastLevel;
+    private static final RandomSource RANDOM = RandomSource.create();
 
     private FirstaidIngameGui() {
     }
@@ -77,6 +66,7 @@ public final class FirstaidIngameGui {
         }
 
         int health = Mth.ceil(getModelDisplayHealth(player, damageModel));
+        boolean healthBlink = updateHealthBlink(player, health);
         AttributeInstance attrMaxHealth = player.getAttribute(Attributes.MAX_HEALTH);
         float healthMax = Math.max((float) attrMaxHealth.getValue(), health);
         int absorption = Mth.ceil(player.getAbsorptionAmount());
@@ -86,39 +76,63 @@ public final class FirstaidIngameGui {
         int left = width / 2 - 91;
         int top = height - 39;
 
-        boolean poisoned = player.hasEffect(MobEffects.POISON);
-        boolean withered = !poisoned && player.hasEffect(MobEffects.WITHER);
+        int regen = player.hasEffect(MobEffects.REGENERATION)
+                ? player.tickCount % Mth.ceil(healthMax + 5.0F)
+                : -1;
+        RANDOM.setSeed((long) player.tickCount * 312871L);
 
         float absorptionRemaining = absorption;
         for (int i = Mth.ceil((healthMax + absorption) / 2.0F) - 1; i >= 0; --i) {
             boolean criticalHalf = (i * 2) + 1 == criticalHalfHearts;
             boolean criticalBlink = i * 2 < criticalHalfHearts && !criticalHalf;
+            boolean spriteBlink = criticalBlink || healthBlink;
             int row = Mth.ceil((float) (i + 1) / 10.0F) - 1;
             int x = left + i % 10 * 8;
             int y = top - row * rowHeight;
+            if (health <= 4) {
+                y += RANDOM.nextInt(2);
+            }
+            if (i == regen) {
+                y -= 2;
+            }
 
-            guiGraphics.blitSprite(criticalBlink ? HEART_CONTAINER_BLINKING_SPRITE : HEART_CONTAINER_SPRITE, x, y, 9, 9);
+            guiGraphics.blitSprite(HeartSpriteHelper.container(player, spriteBlink), x, y, 9, 9);
 
             if (absorptionRemaining > 0.0F) {
                 boolean halfAbsorption = absorptionRemaining == absorption && absorption % 2 == 1;
                 guiGraphics.blitSprite(
                         halfAbsorption
-                                ? (criticalBlink ? HEART_ABSORBING_HALF_BLINKING_SPRITE : HEART_ABSORBING_HALF_SPRITE)
-                                : (criticalBlink ? HEART_ABSORBING_FULL_BLINKING_SPRITE : HEART_ABSORBING_FULL_SPRITE),
+                                ? HeartSpriteHelper.heart(player, true, true, spriteBlink)
+                                : HeartSpriteHelper.heart(player, true, false, spriteBlink),
                         x, y, 9, 9);
                 absorptionRemaining -= absorptionRemaining == absorption && absorption % 2 == 1 ? 1.0F : 2.0F;
                 continue;
             }
 
             if (criticalHalf) {
-                guiGraphics.blitSprite(getHeartSprite(poisoned, withered, true, true), x, y, 9, 9);
+                guiGraphics.blitSprite(HeartSpriteHelper.heart(player, false, true, true), x, y, 9, 9);
             }
             if (i * 2 + 1 < health) {
-                guiGraphics.blitSprite(getHeartSprite(poisoned, withered, false, criticalBlink), x, y, 9, 9);
+                guiGraphics.blitSprite(HeartSpriteHelper.heart(player, false, false, spriteBlink), x, y, 9, 9);
             } else if (i * 2 + 1 == health && !criticalHalf) {
-                guiGraphics.blitSprite(getHeartSprite(poisoned, withered, true, criticalBlink), x, y, 9, 9);
+                guiGraphics.blitSprite(HeartSpriteHelper.heart(player, false, true, spriteBlink), x, y, 9, 9);
             }
         }
+    }
+
+    private static boolean updateHealthBlink(Player player, int health) {
+        int tick = player.tickCount;
+        if (lastPlayer != player || lastLevel != player.level() || lastHealth < 0 || !player.isAlive()) {
+            lastPlayer = player;
+            lastLevel = player.level();
+            lastHealth = health;
+            blinkUntilTick = 0;
+            return false;
+        }
+        if (health < lastHealth) blinkUntilTick = tick + 20;
+        else if (health > lastHealth) blinkUntilTick = tick + 10;
+        lastHealth = health;
+        return blinkUntilTick > tick && (blinkUntilTick - tick) / 3 % 2 == 1;
     }
 
     private static float getModelDisplayHealth(Player player, AbstractPlayerDamageModel damageModel) {
@@ -192,20 +206,5 @@ public final class FirstaidIngameGui {
         return displayHealth <= 0.0F && player.isAlive() && !damageModel.isDead(player) ? 1.0F : displayHealth;
     }
 
-    private static ResourceLocation getHeartSprite(boolean poisoned, boolean withered, boolean halfHeart, boolean blinking) {
-        if (poisoned) {
-            return halfHeart
-                    ? (blinking ? HEART_POISONED_HALF_BLINKING_SPRITE : HEART_POISONED_HALF_SPRITE)
-                    : (blinking ? HEART_POISONED_FULL_BLINKING_SPRITE : HEART_POISONED_FULL_SPRITE);
-        }
-        if (withered) {
-            return halfHeart
-                    ? (blinking ? HEART_WITHERED_HALF_BLINKING_SPRITE : HEART_WITHERED_HALF_SPRITE)
-                    : (blinking ? HEART_WITHERED_FULL_BLINKING_SPRITE : HEART_WITHERED_FULL_SPRITE);
-        }
-        return halfHeart
-                ? (blinking ? HEART_HALF_BLINKING_SPRITE : HEART_HALF_SPRITE)
-                : (blinking ? HEART_FULL_BLINKING_SPRITE : HEART_FULL_SPRITE);
-    }
 }
 

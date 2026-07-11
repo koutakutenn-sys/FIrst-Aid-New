@@ -104,13 +104,16 @@ public final class FirstaidIngameGui {
             MARGIN += 36;
         } else if (player.hasEffect(MobEffects.WITHER)) {
             MARGIN += 72;
+        } else if (player.isFullyFrozen()) {
+            MARGIN += 108;
         }
         float absorptionRemaining = absorption;
 
         RenderSystem.enableBlend();
         for (int i = Mth.ceil((healthMax + absorption) / 2.0F) - 1; i >= 0; --i) {
             boolean thisHalfCritical = (i * 2) + 1 == criticalHalfHearts;
-            final int TOP = 9 * (i * 2 < criticalHalfHearts && !thisHalfCritical ? 5 : 0);
+            boolean hardcore = player.level().getLevelData().isHardcore();
+            final int TOP = 9 * (hardcore || i * 2 < criticalHalfHearts && !thisHalfCritical ? 5 : 0);
             int row = Mth.ceil((float) (i + 1) / 10.0F) - 1;
             int x = left + i % 10 * 8;
             int y = top - row * rowHeight;

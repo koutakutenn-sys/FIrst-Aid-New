@@ -95,27 +95,10 @@ public class CommonUtils {
                 FirstAid.LOGGER.warn("Tried to kill the player on the client! This should only happen on the server! Ignoring...", e);
             }
         }
-        SynchedEntityDataWrapper wrapper = (SynchedEntityDataWrapper) player.entityData;
-        if (source != null && FirstAidConfig.SERVER.allowOtherHealingItems.get()) {
-            boolean protection;
-            wrapper.toggleTracking(false);
-            try {
-                //totem protected the player - make sure he actually isn't dead
-                protection = player.checkTotemDeathProtection(source);
-            } finally {
-                wrapper.toggleTracking(true);
-            }
-            if (protection) {
-                for (AbstractDamageablePart part : damageModel) {
-                    if (part.canCauseDeath)
-                        part.currentHealth = Math.max(part.currentHealth, 1F);
-                }
-                if (player instanceof ServerPlayer serverPlayer) {
-                    syncDamageModel(serverPlayer, damageModel, false);
-                }
-                return;
-            }
+        if (tryUseTotem(damageModel, player, source)) {
+            return;
         }
+        SynchedEntityDataWrapper wrapper = (SynchedEntityDataWrapper) player.entityData;
         IPRCompatHandler handler = PRCompatManager.getHandler();
         if (handler.isBleeding(player)) {
             if (damageModel instanceof PlayerDamageModel playerDamageModel) {
@@ -135,6 +118,36 @@ public class CommonUtils {
         DamageSource resolvedSource = source != null ? source : player.damageSources().generic();
         runWithoutSetHealthInterception(() -> player.setHealth(0.0F));
         player.die(resolvedSource);
+    }
+
+    public static boolean tryUseTotem(AbstractPlayerDamageModel damageModel, Player player, @Nullable DamageSource source) {
+        if (source == null || !FirstAidConfig.SERVER.allowOtherHealingItems.get()) {
+            return false;
+        }
+        SynchedEntityDataWrapper wrapper = (SynchedEntityDataWrapper) player.entityData;
+        boolean protection;
+        wrapper.toggleTracking(false);
+        try {
+            protection = player.checkTotemDeathProtection(source);
+        } finally {
+            wrapper.toggleTracking(true);
+        }
+        if (!protection) {
+            return false;
+        }
+        for (AbstractDamageablePart part : damageModel) {
+            if (part.canCauseDeath) {
+                part.currentHealth = Math.max(part.currentHealth, 1.0F);
+            }
+        }
+        if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+            playerDamageModel.refreshPainState(player);
+            playerDamageModel.syncVanillaHealth(player);
+        }
+        if (player instanceof ServerPlayer serverPlayer) {
+            syncDamageModel(serverPlayer, damageModel, false);
+        }
+        return true;
     }
 
     public static boolean isValidArmorSlot(EquipmentSlot slot) {

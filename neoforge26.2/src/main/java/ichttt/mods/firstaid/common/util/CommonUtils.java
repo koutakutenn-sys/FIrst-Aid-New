@@ -92,6 +92,9 @@ public class CommonUtils {
                 FirstAid.LOGGER.warn("Tried to kill the player on the client! This should only happen on the server! Ignoring...", e);
             }
         }
+        if (tryUseTotem(damageModel, player, source)) {
+            return;
+        }
         IPRCompatHandler handler = PRCompatManager.getHandler();
         if (handler.isBleeding(player)) {
             if (damageModel instanceof PlayerDamageModel playerDamageModel) {
@@ -108,8 +111,28 @@ public class CommonUtils {
 
     public static void killPlayerDirectly(@Nonnull Player player, @Nullable DamageSource source) {
         DamageSource resolvedSource = source != null ? source : player.damageSources().generic();
-        player.setHealth(0.0F);
+        runWithoutSetHealthInterception(() -> player.setHealth(0.0F));
         player.die(resolvedSource);
+    }
+
+    public static boolean tryUseTotem(AbstractPlayerDamageModel damageModel, Player player, @Nullable DamageSource source) {
+        if (source == null || !FirstAidConfig.SERVER.allowOtherHealingItems.get()
+                || !callWithoutSetHealthInterception(() -> player.checkTotemDeathProtection(source))) {
+            return false;
+        }
+        for (AbstractDamageablePart part : damageModel) {
+            if (part.canCauseDeath) {
+                part.currentHealth = Math.max(part.currentHealth, 1.0F);
+            }
+        }
+        if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+            playerDamageModel.refreshPainState(player);
+            playerDamageModel.syncVanillaHealth(player);
+        }
+        if (player instanceof ServerPlayer serverPlayer) {
+            syncDamageModel(serverPlayer);
+        }
+        return true;
     }
 
     public static boolean isValidArmorSlot(EquipmentSlot slot) {

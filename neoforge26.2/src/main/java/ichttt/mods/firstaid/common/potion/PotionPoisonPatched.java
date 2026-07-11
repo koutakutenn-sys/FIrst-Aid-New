@@ -35,6 +35,7 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.common.util.FakePlayer;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 @SuppressWarnings("unused")
 public class PotionPoisonPatched extends MobEffect {
@@ -46,6 +47,12 @@ public class PotionPoisonPatched extends MobEffect {
 
     @Override
     public boolean applyEffectTick(@Nonnull ServerLevel level, @Nonnull LivingEntity entity, int amplifier) {
+        Boolean result = applyFirstAidTick(level, entity);
+        return result != null ? result : super.applyEffectTick(level, entity, amplifier);
+    }
+
+    @Nullable
+    public static Boolean applyFirstAidTick(@Nonnull ServerLevel level, @Nonnull LivingEntity entity) {
         if (entity instanceof Player && !(entity instanceof FakePlayer) && (FirstAidConfig.SERVER.causeDeathBody.get() || FirstAidConfig.SERVER.causeDeathHead.get())) {
             DamageSource magicDamage = entity.damageSources().magic();
             if (level.isClientSide() || !entity.isAlive() || entity.isInvulnerableTo(level, magicDamage))
@@ -60,7 +67,7 @@ public class PotionPoisonPatched extends MobEffect {
             DamageDistribution.handleDamageTaken(POISON_DISTRIBUTION, playerDamageModel, 1.0F, player, magicDamage, true, false);
             return true;
         }
-        return super.applyEffectTick(level, entity, amplifier);
+        return null;
     }
 
     @Override

@@ -33,6 +33,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.Util;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.player.Player;
 
 import java.text.DecimalFormat;
 import java.util.EnumMap;
@@ -41,12 +42,6 @@ import java.util.Objects;
 public final class HealthRenderUtils {
     public static final ResourceLocation SHOW_WOUNDS_LOCATION = ResourceLocation.fromNamespaceAndPath(FirstAid.MODID, "textures/gui/show_wounds.png");
     public static final DecimalFormat TEXT_FORMAT = new DecimalFormat("0.0");
-    private static final ResourceLocation HEART_CONTAINER_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/container");
-    private static final ResourceLocation HEART_CONTAINER_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/container_blinking");
-    private static final ResourceLocation HEART_FULL_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/full");
-    private static final ResourceLocation HEART_FULL_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/full_blinking");
-    private static final ResourceLocation HEART_HALF_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/half");
-    private static final ResourceLocation HEART_HALF_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/half_blinking");
 
     private static final Object2IntOpenHashMap<EnumPlayerPart> PREV_HEALTH = new Object2IntOpenHashMap<>();
     private static final EnumMap<EnumPlayerPart, FlashStateManager> FLASH_STATES = new EnumMap<>(EnumPlayerPart.class);
@@ -142,11 +137,12 @@ public final class HealthRenderUtils {
             }
         }
 
-        renderMax(regen, lowOffsets, 0, maxHealth, heartsPerRow, xTranslation, yTranslation, guiGraphics, highlight);
+        Player player = minecraft.player;
+        renderMax(regen, lowOffsets, 0, maxHealth, heartsPerRow, xTranslation, yTranslation, guiGraphics, player, highlight);
         if (totalHearts > maxHealth) {
-            renderMax(regen, lowOffsets, maxHealth, totalHearts - maxHealth, heartsPerRow, xTranslation, yTranslation, guiGraphics, false);
+            renderMax(regen, lowOffsets, maxHealth, totalHearts - maxHealth, heartsPerRow, xTranslation, yTranslation, guiGraphics, player, false);
         }
-        renderCurrentHealth(regen, lowOffsets, current, heartsPerRow, xTranslation, yTranslation, guiGraphics, highlight);
+        renderCurrentHealth(regen, lowOffsets, current, heartsPerRow, xTranslation, yTranslation, guiGraphics, player, highlight);
     }
 
     private static int getRenderedHeartSlots(AbstractDamageablePart damageablePart) {
@@ -174,14 +170,14 @@ public final class HealthRenderUtils {
         return maxCurrentHearts >> 1;
     }
 
-    private static void renderMax(int regen, int[] lowOffsets, int startSlot, int max, int heartsPerRow, int baseX, int baseY, GuiGraphics guiGraphics, boolean highlight) {
-        renderHeartSprites(regen, lowOffsets, startSlot, max, false, heartsPerRow, baseX, baseY, guiGraphics, highlight ? HEART_CONTAINER_BLINKING_SPRITE : HEART_CONTAINER_SPRITE, highlight ? HEART_CONTAINER_BLINKING_SPRITE : HEART_CONTAINER_SPRITE);
+    private static void renderMax(int regen, int[] lowOffsets, int startSlot, int max, int heartsPerRow, int baseX, int baseY, GuiGraphics guiGraphics, Player player, boolean highlight) {
+        renderHeartSprites(regen, lowOffsets, startSlot, max, false, heartsPerRow, baseX, baseY, guiGraphics, HeartSpriteHelper.container(player, highlight), HeartSpriteHelper.container(player, highlight));
     }
 
-    private static void renderCurrentHealth(int regen, int[] lowOffsets, int current, int heartsPerRow, int baseX, int baseY, GuiGraphics guiGraphics, boolean highlight) {
+    private static void renderCurrentHealth(int regen, int[] lowOffsets, int current, int heartsPerRow, int baseX, int baseY, GuiGraphics guiGraphics, Player player, boolean highlight) {
         boolean renderLastHalf = current % 2 != 0;
         int render = getFilledHeartSlots(current);
-        renderHeartSprites(regen, lowOffsets, 0, render, renderLastHalf, heartsPerRow, baseX, baseY, guiGraphics, highlight ? HEART_HALF_BLINKING_SPRITE : HEART_HALF_SPRITE, highlight ? HEART_FULL_BLINKING_SPRITE : HEART_FULL_SPRITE);
+        renderHeartSprites(regen, lowOffsets, 0, render, renderLastHalf, heartsPerRow, baseX, baseY, guiGraphics, HeartSpriteHelper.heart(player, false, true, highlight), HeartSpriteHelper.heart(player, false, false, highlight));
     }
 
     private static void renderHeartSprites(int regen, int[] lowOffsets, int startSlot, int toDraw, boolean lastOneHalf, int heartsPerRow, int baseX, int baseY, GuiGraphics guiGraphics, ResourceLocation halfSprite, ResourceLocation fullSprite) {
@@ -211,4 +207,3 @@ public final class HealthRenderUtils {
         return 0xD95145;
     }
 }
-

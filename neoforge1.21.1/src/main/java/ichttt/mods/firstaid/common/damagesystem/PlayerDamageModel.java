@@ -41,6 +41,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -596,7 +597,7 @@ public class PlayerDamageModel extends AbstractPlayerDamageModel implements Look
         }
     }
 
-    public void handlePostDamage(Player player) {
+    public void handlePostDamage(Player player, @Nullable DamageSource source) {
         if (hasNoRemainingBodyHealth() || hasAllCriticalPartsCollapsed()) {
             criticalConditionActive = false;
             clearUnconsciousState();
@@ -605,6 +606,9 @@ public class PlayerDamageModel extends AbstractPlayerDamageModel implements Look
             return;
         }
         if (criticalConditionActive || !hasCriticalPartCollapsed()) {
+            return;
+        }
+        if (CommonUtils.tryUseTotem(this, player, source)) {
             return;
         }
         criticalConditionActive = true;

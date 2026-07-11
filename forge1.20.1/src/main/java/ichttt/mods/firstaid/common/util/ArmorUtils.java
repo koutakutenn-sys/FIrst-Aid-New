@@ -177,7 +177,12 @@ public class ArmorUtils {
                 int itemDamage = Math.max((int) damage, 1);
                 itemStack.hurtAndBreak(itemDamage, entity, (player) -> player.broadcastBreakEvent(slot));
             }
-            damage = CombatRules.getDamageAfterAbsorb(damage, totalArmor, totalToughness);
+            float localDamage = CombatRules.getDamageAfterAbsorb(damage, totalArmor, totalToughness);
+            float vanillaDamage = CombatRules.getDamageAfterAbsorb(
+                    damage,
+                    entity.getArmorValue(),
+                    (float) entity.getAttributeValue(Attributes.ARMOR_TOUGHNESS));
+            damage = Math.max(localDamage, vanillaDamage);
         }
         return damage;
     }
@@ -242,7 +247,8 @@ public class ArmorUtils {
                 }
                 mutableInt.add(val * multiplier);
             }, itemStackFromSlot);
-            k = mutableInt.getValue();
+            int vanillaProtection = EnchantmentHelper.getDamageProtection(player.getArmorSlots(), source);
+            k = Math.min(mutableInt.getValue(), vanillaProtection);
         } else if (enchantmentMode == FirstAidConfig.Server.ArmorEnchantmentMode.GLOBAL_ENCHANTMENTS) {
             k = EnchantmentHelper.getDamageProtection(player.getArmorSlots(), source);
         } else {

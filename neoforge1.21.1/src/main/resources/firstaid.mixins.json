@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "LivingEntityHealthMixin",
+    "PoisonMobEffectMixin",
     "LivingEntityDamageMixin",
     "PlayerDimensionsMixin",
     "ProjectileMixin"

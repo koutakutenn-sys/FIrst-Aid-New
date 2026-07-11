@@ -300,20 +300,20 @@ public final class FirstAidConfig {
             causeDeathHead = define(boolValue("causeDeathHead", true));
             causeDeathBody = define(boolValue("causeDeathBody", true));
 
-            headArmorMultiplier = define(doubleValue("headArmorMultiplier", 6D, 1D, 16D));
-            chestArmorMultiplier = define(doubleValue("chestArmorMultiplier", 2.5D, 1D, 16D));
-            legsArmorMultiplier = define(doubleValue("legsArmorMultiplier", 3D, 1D, 16D));
-            feetArmorMultiplier = define(doubleValue("feetArmorMultiplier", 6D, 1D, 16D));
+            headArmorMultiplier = define(doubleValue("headArmorMultiplier", 6D, 0D, 16D));
+            chestArmorMultiplier = define(doubleValue("chestArmorMultiplier", 2.5D, 0D, 16D));
+            legsArmorMultiplier = define(doubleValue("legsArmorMultiplier", 3D, 0D, 16D));
+            feetArmorMultiplier = define(doubleValue("feetArmorMultiplier", 6D, 0D, 16D));
 
             headArmorOffset = define(doubleValue("headArmorOffset", 1D, 0D, 4D));
             chestArmorOffset = define(doubleValue("chestArmorOffset", 0D, 0D, 4D));
             legsArmorOffset = define(doubleValue("legsArmorOffset", 0D, 0D, 4D));
             feetArmorOffset = define(doubleValue("feetArmorOffset", 0D, 0D, 4D));
 
-            headThoughnessMultiplier = define(doubleValue("headThoughnessMultiplier", 4D, 1D, 16D));
-            chestThoughnessMultiplier = define(doubleValue("chestThoughnessMultiplier", 3D, 1D, 16D));
-            legsThoughnessMultiplier = define(doubleValue("legsThoughnessMultiplier", 3D, 1D, 16D));
-            feetThoughnessMultiplier = define(doubleValue("feetThoughnessMultiplier", 3.5D, 1D, 16D));
+            headThoughnessMultiplier = define(doubleValue("headThoughnessMultiplier", 4D, 0D, 16D));
+            chestThoughnessMultiplier = define(doubleValue("chestThoughnessMultiplier", 3D, 0D, 16D));
+            legsThoughnessMultiplier = define(doubleValue("legsThoughnessMultiplier", 3D, 0D, 16D));
+            feetThoughnessMultiplier = define(doubleValue("feetThoughnessMultiplier", 3.5D, 0D, 16D));
 
             headThoughnessOffset = define(doubleValue("headThoughnessOffset", 0D, 0D, 4D));
             chestThoughnessOffset = define(doubleValue("chestThoughnessOffset", 0D, 0D, 4D));
@@ -339,9 +339,9 @@ public final class FirstAidConfig {
             friendlyRandomDistributionChance = define(doubleValue("friendlyRandomDistributionChance", FirstAid.DEFAULT_FRIENDLY_RANDOM_DISTRIBUTION_CHANCE, 0D, 1D));
             armorEnchantmentMode = define(enumValue("armorEnchantmentMode", ArmorEnchantmentMode.LOCAL_ENCHANTMENTS, ArmorEnchantmentMode.class));
 
-            enchantmentMultiplier = define(intValue("enchantmentMultiplier", 4, 1, 4));
+            enchantmentMultiplier = define(intValue("enchantmentMultiplier", 4, 0, 4));
             enchMulOverrideIdentifiers = define(stringList("enchantmentOverrideIdentifiers", Collections.singletonList("minecraft:feather_falling"), value -> !value.isBlank()));
-            enchMulOverrideMultiplier = define(intList("enchantmentOverrideMultiplier", Collections.singletonList(2), value -> value >= 1 && value <= 4));
+            enchMulOverrideMultiplier = define(intList("enchantmentOverrideMultiplier", Collections.singletonList(2), value -> value >= 0 && value <= 4));
 
             dynamicPainEnabled = define(boolValue("dynamicPainEnabled", false));
             mildPainLevel = define(intValue("mildPainLevel", 1, 1, 5));

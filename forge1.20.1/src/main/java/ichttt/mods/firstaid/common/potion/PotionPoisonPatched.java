@@ -20,7 +20,9 @@ package ichttt.mods.firstaid.common.potion;
 
 import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.FirstAidConfig;
+import ichttt.mods.firstaid.api.damagesystem.AbstractDamageablePart;
 import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
+import ichttt.mods.firstaid.api.distribution.IDamageDistributionAlgorithm;
 import ichttt.mods.firstaid.common.damagesystem.distribution.DamageDistribution;
 import ichttt.mods.firstaid.common.damagesystem.distribution.RandomDamageDistributionAlgorithm;
 import ichttt.mods.firstaid.common.util.CommonUtils;
@@ -39,6 +41,7 @@ import java.lang.reflect.Method;
 
 @SuppressWarnings("unused")
 public class PotionPoisonPatched extends MobEffect {
+    private static final IDamageDistributionAlgorithm POISON_DISTRIBUTION = new PoisonDamageDistributionAlgorithm();
     private static final Method getHurtSound = ObfuscationReflectionHelper.findMethod(LivingEntity.class, "m_7975_", DamageSource.class);
     private static final Method getSoundVolume = ObfuscationReflectionHelper.findMethod(LivingEntity.class, "m_6121_");
     private static final Method getVoicePitch = ObfuscationReflectionHelper.findMethod(LivingEntity.class, "m_6100_");
@@ -57,7 +60,7 @@ public class PotionPoisonPatched extends MobEffect {
             Player player = (Player) entity;
             AbstractPlayerDamageModel playerDamageModel = CommonUtils.getDamageModel(player);
             if (playerDamageModel == null) return;
-            if (DamageDistribution.handleDamageTaken(RandomDamageDistributionAlgorithm.ANY_NOKILL, playerDamageModel, 1.0F, player, entity.damageSources().magic(), true, false) != 1.0F) {
+            if (DamageDistribution.handleDamageTaken(POISON_DISTRIBUTION, playerDamageModel, 1.0F, player, entity.damageSources().magic(), true, false) != 1.0F) {
                 try {
                     SoundEvent sound = (SoundEvent) getHurtSound.invoke(player, entity.damageSources().magic());
                     player.level().playSound(null, player.getX(), player.getY(), player.getZ(), sound, player.getSoundSource(), (float) getSoundVolume.invoke(player), (float) getVoicePitch.invoke(player));
@@ -68,6 +71,17 @@ public class PotionPoisonPatched extends MobEffect {
         }
         else {
             super.applyEffectTick(entity, amplifier);
+        }
+    }
+
+    private static final class PoisonDamageDistributionAlgorithm extends RandomDamageDistributionAlgorithm {
+        private PoisonDamageDistributionAlgorithm() {
+            super(false, true);
+        }
+
+        @Override
+        protected float minHealth(@Nonnull Player player, @Nonnull AbstractDamageablePart playerPart) {
+            return playerPart.getMaxHealth() * 0.3F;
         }
     }
 }

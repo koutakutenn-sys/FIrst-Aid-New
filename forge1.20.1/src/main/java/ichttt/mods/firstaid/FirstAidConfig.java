@@ -322,7 +322,7 @@ public class FirstAidConfig {
 
             enchantmentMultiplier = builder
                     .comment("Specifies the default modifier. This is only used if armorEnchantmentMode is LOCAL_ENCHANTMENTS, as this is used scale up the values to somewhat match what vanilla balances around (as vanilla balances around global enchantments)")
-                    .defineInRange("enchantmentMultiplier", 4, 1, 4);
+                    .defineInRange("enchantmentMultiplier", 4, 0, 4);
 
             enchMulOverrideResourceLocations = builder
                     .comment("Specifies the overrides for the the modifier. This is only used if armorEnchantmentMode is LOCAL_ENCHANTMENTS. This can be used to set another multiplier for special enchantments",
@@ -337,11 +337,11 @@ public class FirstAidConfig {
                     });
             enchMulOverrideMultiplier = builder
                     .comment("Specifies the overrides for the the modifier. This is only used if armorEnchantmentMode is LOCAL_ENCHANTMENTS. This can be used to set another multiplier for special enchantments",
-                            "This list specifies the multiplier of the corresponding resource location. See resourceLocations comment. Must be between 1 and 4")
+                            "This list specifies the multiplier of the corresponding resource location. See resourceLocations comment. Must be between 0 and 4")
                     .defineList("overrideMultiplier", Collections.singletonList(2), o -> {
                         try {
                             int val = Integer.parseInt(o.toString());
-                            return val >= 1 && val <= 4;
+                            return val >= 0 && val <= 4;
                         } catch (NumberFormatException ignored) {}
                         FirstAid.LOGGER.warn("Invalid entry " + o.toString() + " for overrideMultiplier found!");
                         return false;
@@ -430,7 +430,7 @@ public class FirstAidConfig {
         }
 
         private static ForgeConfigSpec.DoubleValue multiplierEntry(ForgeConfigSpec.Builder builder, String name, double defaultVal) {
-            return builder.comment("The multiplier for local armor for every armor of slot " + name).translation("firstaid.config.multiplier." + name.toLowerCase(Locale.ROOT)).defineInRange("multiplier" + name, defaultVal, 1D, 16D);
+            return builder.comment("The multiplier for local armor for every armor of slot " + name).translation("firstaid.config.multiplier." + name.toLowerCase(Locale.ROOT)).defineInRange("multiplier" + name, defaultVal, 0D, 16D);
         }
 
         private static ForgeConfigSpec.DoubleValue offsetEntry(ForgeConfigSpec.Builder builder, String name, double defaultVal) {

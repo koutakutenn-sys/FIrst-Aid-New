@@ -19,17 +19,12 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.player.Player;
 
 public final class HealthRenderUtils {
    public static final Identifier SHOW_WOUNDS_LOCATION = Identifier.fromNamespaceAndPath(FirstAid.MODID, "textures/gui/show_wounds.png");
    public static final DecimalFormat TEXT_FORMAT = new DecimalFormat("0.0");
    private static final int ABSORPTION_TEXT_COLOR = 14864706;
-   private static final Identifier HEART_CONTAINER_SPRITE = Identifier.withDefaultNamespace("hud/heart/container");
-   private static final Identifier HEART_CONTAINER_BLINKING_SPRITE = Identifier.withDefaultNamespace("hud/heart/container_blinking");
-   private static final Identifier HEART_FULL_SPRITE = Identifier.withDefaultNamespace("hud/heart/full");
-   private static final Identifier HEART_FULL_BLINKING_SPRITE = Identifier.withDefaultNamespace("hud/heart/full_blinking");
-   private static final Identifier HEART_HALF_SPRITE = Identifier.withDefaultNamespace("hud/heart/half");
-   private static final Identifier HEART_HALF_BLINKING_SPRITE = Identifier.withDefaultNamespace("hud/heart/half_blinking");
    private static final Object2IntOpenHashMap<EnumPlayerPart> PREV_HEALTH = new Object2IntOpenHashMap();
    private static final EnumMap<EnumPlayerPart, FlashStateManager> FLASH_STATES = new EnumMap<>(EnumPlayerPart.class);
 
@@ -139,12 +134,13 @@ public final class HealthRenderUtils {
          }
       }
 
-      renderMax(regen, lowOffsets, 0, maxHealth, heartsPerRow, xTranslation, yTranslation, guiGraphics, highlight);
+      Player player = minecraft.player;
+      renderMax(regen, lowOffsets, 0, maxHealth, heartsPerRow, xTranslation, yTranslation, guiGraphics, player, highlight);
       if (totalHearts > maxHealth) {
-         renderMax(regen, lowOffsets, maxHealth, totalHearts - maxHealth, heartsPerRow, xTranslation, yTranslation, guiGraphics, false);
+         renderMax(regen, lowOffsets, maxHealth, totalHearts - maxHealth, heartsPerRow, xTranslation, yTranslation, guiGraphics, player, false);
       }
 
-      renderCurrentHealth(regen, lowOffsets, current, heartsPerRow, xTranslation, yTranslation, guiGraphics, highlight);
+      renderCurrentHealth(regen, lowOffsets, current, heartsPerRow, xTranslation, yTranslation, guiGraphics, player, highlight);
    }
 
    private static int getRenderedHeartSlots(AbstractDamageablePart damageablePart) {
@@ -175,7 +171,7 @@ public final class HealthRenderUtils {
    }
 
    private static void renderMax(
-      int regen, int[] lowOffsets, int startSlot, int max, int heartsPerRow, int baseX, int baseY, GuiGraphicsExtractor guiGraphics, boolean highlight
+      int regen, int[] lowOffsets, int startSlot, int max, int heartsPerRow, int baseX, int baseY, GuiGraphicsExtractor guiGraphics, Player player, boolean highlight
    ) {
       renderHeartSprites(
          regen,
@@ -187,13 +183,13 @@ public final class HealthRenderUtils {
          baseX,
          baseY,
          guiGraphics,
-         highlight ? HEART_CONTAINER_BLINKING_SPRITE : HEART_CONTAINER_SPRITE,
-         highlight ? HEART_CONTAINER_BLINKING_SPRITE : HEART_CONTAINER_SPRITE
+         HeartSpriteHelper.container(player, highlight),
+         HeartSpriteHelper.container(player, highlight)
       );
    }
 
    private static void renderCurrentHealth(
-      int regen, int[] lowOffsets, int current, int heartsPerRow, int baseX, int baseY, GuiGraphicsExtractor guiGraphics, boolean highlight
+      int regen, int[] lowOffsets, int current, int heartsPerRow, int baseX, int baseY, GuiGraphicsExtractor guiGraphics, Player player, boolean highlight
    ) {
       boolean renderLastHalf = current % 2 != 0;
       int render = getFilledHeartSlots(current);
@@ -207,8 +203,8 @@ public final class HealthRenderUtils {
          baseX,
          baseY,
          guiGraphics,
-         highlight ? HEART_HALF_BLINKING_SPRITE : HEART_HALF_SPRITE,
-         highlight ? HEART_FULL_BLINKING_SPRITE : HEART_FULL_SPRITE
+         HeartSpriteHelper.heart(player, false, true, highlight),
+         HeartSpriteHelper.heart(player, false, false, highlight)
       );
    }
 

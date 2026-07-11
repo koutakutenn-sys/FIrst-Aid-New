@@ -3,6 +3,7 @@ package ichttt.mods.firstaid.common.util;
 import com.google.common.math.DoubleMath;
 import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.FirstAidConfig;
+import java.util.List;
 import javax.annotation.Nonnull;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -20,6 +21,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 
 public class ArmorUtils {
@@ -189,7 +191,11 @@ public class ArmorUtils {
                itemStack.hurtAndBreak(itemDamage, entity, slot);
             }
 
-            damage = CombatRules.getDamageAfterAbsorb(entity, damage, source, totalArmor, totalToughness);
+            float localDamage = CombatRules.getDamageAfterAbsorb(entity, damage, source, totalArmor, totalToughness);
+            float vanillaDamage = CombatRules.getDamageAfterAbsorb(
+               entity, damage, source, entity.getArmorValue(), (float)entity.getAttributeValue(Attributes.ARMOR_TOUGHNESS)
+            );
+            damage = Math.max(localDamage, vanillaDamage);
          }
 
          return damage;
@@ -222,26 +228,40 @@ public class ArmorUtils {
 
    public static float applyEnchantmentModifiers(Player player, EquipmentSlot slot, DamageSource source, float damage) {
       FirstAidConfig.Server.ArmorEnchantmentMode enchantmentMode = FirstAidConfig.SERVER.armorEnchantmentMode.get();
-      int k;
       if (player.level() instanceof ServerLevel serverLevel) {
          if (enchantmentMode == FirstAidConfig.Server.ArmorEnchantmentMode.LOCAL_ENCHANTMENTS) {
-            damage = EnchantmentHelper.modifyDamage(serverLevel, player.getItemBySlot(slot), player, source, damage);
-            k = 0;
+            ItemStack itemStack = player.getItemBySlot(slot);
+            float localDamage = EnchantmentHelper.modifyDamage(serverLevel, itemStack, player, source, damage);
+            int multiplier = getEnchantmentMultiplier(itemStack);
+            float scaledLocalDamage = Math.max(0.0F, damage - (damage - localDamage) * multiplier);
+            float vanillaProtection = EnchantmentHelper.getDamageProtection(serverLevel, player, source);
+            float vanillaDamage = CombatRules.getDamageAfterMagicAbsorb(damage, vanillaProtection);
+            return Math.max(scaledLocalDamage, vanillaDamage);
          } else {
             if (enchantmentMode != FirstAidConfig.Server.ArmorEnchantmentMode.GLOBAL_ENCHANTMENTS) {
                throw new RuntimeException("What dark magic is " + enchantmentMode);
             }
 
-            k = Math.round(EnchantmentHelper.getDamageProtection(serverLevel, player, source));
+            float protection = EnchantmentHelper.getDamageProtection(serverLevel, player, source);
+            return CombatRules.getDamageAfterMagicAbsorb(damage, protection);
          }
-      } else {
-         k = 0;
       }
-
-      if (k > 0) {
-         damage = CombatRules.getDamageAfterMagicAbsorb(damage, k);
-      }
-
       return damage;
+   }
+
+   private static int getEnchantmentMultiplier(ItemStack itemStack) {
+      int multiplier = FirstAidConfig.SERVER.enchantmentMultiplier.get();
+      List<String> identifiers = FirstAidConfig.SERVER.enchMulOverrideIdentifiers.get();
+      List<Integer> overrides = FirstAidConfig.SERVER.enchMulOverrideMultiplier.get();
+      for (Holder<Enchantment> enchantment : EnchantmentHelper.getEnchantmentsForCrafting(itemStack).keySet()) {
+         String id = enchantment.getRegisteredName();
+         for (int i = 0; i < Math.min(identifiers.size(), overrides.size()); i++) {
+            if (identifiers.get(i).equals(id)) {
+               multiplier = Math.min(multiplier, overrides.get(i));
+               break;
+            }
+         }
+      }
+      return multiplier;
    }
 }

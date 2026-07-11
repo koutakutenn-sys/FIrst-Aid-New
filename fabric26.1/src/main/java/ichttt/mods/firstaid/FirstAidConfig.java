@@ -553,18 +553,18 @@ public final class FirstAidConfig {
       public Server() {
          this.causeDeathHead = this.define(FirstAidConfig.boolValue("causeDeathHead", true));
          this.causeDeathBody = this.define(FirstAidConfig.boolValue("causeDeathBody", true));
-         this.headArmorMultiplier = this.define(FirstAidConfig.doubleValue("headArmorMultiplier", 6.0, 1.0, 16.0));
-         this.chestArmorMultiplier = this.define(FirstAidConfig.doubleValue("chestArmorMultiplier", 2.5, 1.0, 16.0));
-         this.legsArmorMultiplier = this.define(FirstAidConfig.doubleValue("legsArmorMultiplier", 3.0, 1.0, 16.0));
-         this.feetArmorMultiplier = this.define(FirstAidConfig.doubleValue("feetArmorMultiplier", 6.0, 1.0, 16.0));
+         this.headArmorMultiplier = this.define(FirstAidConfig.doubleValue("headArmorMultiplier", 6.0, 0.0, 16.0));
+         this.chestArmorMultiplier = this.define(FirstAidConfig.doubleValue("chestArmorMultiplier", 2.5, 0.0, 16.0));
+         this.legsArmorMultiplier = this.define(FirstAidConfig.doubleValue("legsArmorMultiplier", 3.0, 0.0, 16.0));
+         this.feetArmorMultiplier = this.define(FirstAidConfig.doubleValue("feetArmorMultiplier", 6.0, 0.0, 16.0));
          this.headArmorOffset = this.define(FirstAidConfig.doubleValue("headArmorOffset", 1.0, 0.0, 4.0));
          this.chestArmorOffset = this.define(FirstAidConfig.doubleValue("chestArmorOffset", 0.0, 0.0, 4.0));
          this.legsArmorOffset = this.define(FirstAidConfig.doubleValue("legsArmorOffset", 0.0, 0.0, 4.0));
          this.feetArmorOffset = this.define(FirstAidConfig.doubleValue("feetArmorOffset", 0.0, 0.0, 4.0));
-         this.headThoughnessMultiplier = this.define(FirstAidConfig.doubleValue("headThoughnessMultiplier", 4.0, 1.0, 16.0));
-         this.chestThoughnessMultiplier = this.define(FirstAidConfig.doubleValue("chestThoughnessMultiplier", 3.0, 1.0, 16.0));
-         this.legsThoughnessMultiplier = this.define(FirstAidConfig.doubleValue("legsThoughnessMultiplier", 3.0, 1.0, 16.0));
-         this.feetThoughnessMultiplier = this.define(FirstAidConfig.doubleValue("feetThoughnessMultiplier", 3.5, 1.0, 16.0));
+         this.headThoughnessMultiplier = this.define(FirstAidConfig.doubleValue("headThoughnessMultiplier", 4.0, 0.0, 16.0));
+         this.chestThoughnessMultiplier = this.define(FirstAidConfig.doubleValue("chestThoughnessMultiplier", 3.0, 0.0, 16.0));
+         this.legsThoughnessMultiplier = this.define(FirstAidConfig.doubleValue("legsThoughnessMultiplier", 3.0, 0.0, 16.0));
+         this.feetThoughnessMultiplier = this.define(FirstAidConfig.doubleValue("feetThoughnessMultiplier", 3.5, 0.0, 16.0));
          this.headThoughnessOffset = this.define(FirstAidConfig.doubleValue("headThoughnessOffset", 0.0, 0.0, 4.0));
          this.chestThoughnessOffset = this.define(FirstAidConfig.doubleValue("chestThoughnessOffset", 0.0, 0.0, 4.0));
          this.legsThoughnessOffset = this.define(FirstAidConfig.doubleValue("legsThoughnessOffset", 0.0, 0.0, 4.0));
@@ -595,12 +595,12 @@ public final class FirstAidConfig {
                "armorEnchantmentMode", FirstAidConfig.Server.ArmorEnchantmentMode.LOCAL_ENCHANTMENTS, FirstAidConfig.Server.ArmorEnchantmentMode.class
             )
          );
-         this.enchantmentMultiplier = this.define(FirstAidConfig.intValue("enchantmentMultiplier", 4, 1, 4));
+         this.enchantmentMultiplier = this.define(FirstAidConfig.intValue("enchantmentMultiplier", 4, 0, 4));
          this.enchMulOverrideIdentifiers = this.define(
             FirstAidConfig.stringList("enchantmentOverrideIdentifiers", Collections.singletonList("minecraft:feather_falling"), value -> !value.isBlank())
          );
          this.enchMulOverrideMultiplier = this.define(
-            FirstAidConfig.intList("enchantmentOverrideMultiplier", Collections.singletonList(2), value -> value >= 1 && value <= 4)
+            FirstAidConfig.intList("enchantmentOverrideMultiplier", Collections.singletonList(2), value -> value >= 0 && value <= 4)
          );
          this.dynamicPainEnabled = this.define(FirstAidConfig.boolValue("dynamicPainEnabled", false));
          this.mildPainLevel = this.define(FirstAidConfig.intValue("mildPainLevel", 1, 1, 5));

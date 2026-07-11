@@ -8,6 +8,7 @@ import ichttt.mods.firstaid.common.damagesystem.distribution.DamageDistribution;
 import ichttt.mods.firstaid.common.damagesystem.distribution.RandomDamageDistributionAlgorithm;
 import ichttt.mods.firstaid.common.util.CommonUtils;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
@@ -23,6 +24,12 @@ public class PotionPoisonPatched extends MobEffect {
    }
 
    public boolean applyEffectTick(@Nonnull ServerLevel level, @Nonnull LivingEntity entity, int amplifier) {
+      Boolean result = applyFirstAidTick(level, entity);
+      return result != null ? result : super.applyEffectTick(level, entity, amplifier);
+   }
+
+   @Nullable
+   public static Boolean applyFirstAidTick(@Nonnull ServerLevel level, @Nonnull LivingEntity entity) {
       if (entity instanceof Player && (FirstAidConfig.SERVER.causeDeathBody.get() || FirstAidConfig.SERVER.causeDeathHead.get())) {
          DamageSource magicDamage = entity.damageSources().magic();
          if (!level.isClientSide() && entity.isAlive() && !entity.isInvulnerableTo(level, magicDamage)) {
@@ -41,9 +48,8 @@ public class PotionPoisonPatched extends MobEffect {
          } else {
             return false;
          }
-      } else {
-         return super.applyEffectTick(level, entity, amplifier);
       }
+      return null;
    }
 
    public boolean shouldApplyEffectTickThisTick(int duration, int amplifier) {

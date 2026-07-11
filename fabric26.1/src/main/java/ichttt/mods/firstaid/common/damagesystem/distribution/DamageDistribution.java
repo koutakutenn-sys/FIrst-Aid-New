@@ -85,7 +85,7 @@ public abstract class DamageDistribution implements IDamageDistributionAlgorithm
          return 0.0F;
       } else {
          if (damageModel instanceof PlayerDamageModel playerDamageModel) {
-            playerDamageModel.handlePostDamage(player);
+            playerDamageModel.handlePostDamage(player, source);
             playerDamageModel.syncVanillaHealth(player);
          }
 
