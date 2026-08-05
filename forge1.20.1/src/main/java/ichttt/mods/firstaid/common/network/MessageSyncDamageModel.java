@@ -83,10 +83,11 @@ public class MessageSyncDamageModel {
                     return;
                 }
                 boolean wasUnconscious = damageModel instanceof PlayerDamageModel playerDamageModel && playerDamageModel.isUnconscious();
+                // Apply saved max/current health first so scale logic does not clamp against stale caps.
+                damageModel.deserializeNBT(message.playerDamageModel);
                 if (message.scaleMaxHealth) {
                     damageModel.runScaleLogic(targetPlayer);
                 }
-                damageModel.deserializeNBT(message.playerDamageModel);
                 if (damageModel instanceof PlayerDamageModel playerDamageModel) {
                     playerDamageModel.refreshClientUnconsciousPose(targetPlayer);
                 }

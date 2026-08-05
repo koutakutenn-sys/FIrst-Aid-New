@@ -144,6 +144,11 @@ public class DamageablePart extends AbstractDamageablePart {
     public void deserializeNBT(@Nullable CompoundTag nbt) {
         if (nbt == null)
             return;
+        // Restore max health before current health so scaled limbs are not clamped to the
+        // unscaled config cap on world load (see GitHub issue #5).
+        if (nbt.contains("maxHealth")) {
+            setMaxHealth(nbt.getInt("maxHealth"));
+        }
         currentHealth = Math.min(maxHealth, nbt.getFloat("health"));
         ItemStack stack = null;
         if (nbt.contains("healer"))

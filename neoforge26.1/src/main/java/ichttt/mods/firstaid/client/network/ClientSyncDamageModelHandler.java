@@ -41,12 +41,12 @@ public final class ClientSyncDamageModelHandler {
             return;
         }
 
+        boolean wasUnconscious = isUnconscious(damageModel);
+        // Apply saved max/current health first so scale logic does not clamp against stale caps.
+        damageModel.deserializeNBT(message.playerDamageModel());
         if (message.shouldScaleMaxHealth()) {
             damageModel.runScaleLogic(targetPlayer);
         }
-
-        boolean wasUnconscious = isUnconscious(damageModel);
-        damageModel.deserializeNBT(message.playerDamageModel());
         if (wasUnconscious != isUnconscious(damageModel)) {
             targetPlayer.refreshDimensions();
         }

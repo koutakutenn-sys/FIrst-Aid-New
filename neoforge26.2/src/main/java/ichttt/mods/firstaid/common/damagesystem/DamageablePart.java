@@ -173,6 +173,11 @@ public class DamageablePart extends AbstractDamageablePart {
             return;
         activeHealer = null;
         absorption = 0F;
+        // Restore max health before current health so scaled limbs are not clamped to the
+        // unscaled config cap on world load (see GitHub issue #5).
+        if (nbt.contains("maxHealth")) {
+            setMaxHealth(nbt.getIntOr("maxHealth", maxHealth));
+        }
         currentHealth = Math.min(maxHealth, nbt.getFloatOr("health", currentHealth));
         if (nbt.contains("absorption")) {
             setAbsorption(nbt.getFloatOr("absorption", 0F));
