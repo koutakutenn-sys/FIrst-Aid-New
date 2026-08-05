@@ -31,7 +31,6 @@ import ichttt.mods.firstaid.common.EventHandler;
 import ichttt.mods.firstaid.common.RegistryObjects;
 import ichttt.mods.firstaid.common.compat.playerrevive.PRCompatManager;
 import ichttt.mods.firstaid.common.damagesystem.debuff.SharedDebuff;
-import ichttt.mods.firstaid.common.damagesystem.distribution.HealthDistribution;
 import ichttt.mods.firstaid.common.init.FirstAidDataAttachments;
 import ichttt.mods.firstaid.common.registries.FirstAidRegistryLookups;
 import ichttt.mods.firstaid.common.registries.LookupReloadListener;
@@ -777,9 +776,10 @@ public class PlayerDamageModel extends AbstractPlayerDamageModel implements Look
                 throw new RuntimeException("Unknown constant " + mode);
         }
         float scaledHealth = currentHealth * player.getMaxHealth();
-        if ((FirstAid.naturalRegenMode == FirstAid.NaturalRegenMode.LIMITED || FirstAid.naturalRegenMode == FirstAid.NaturalRegenMode.LIMITED2) && !HealthDistribution.canApplyNaturalRegen(this)) {
-            return player.getMaxHealth();
-        }
+        // Do not force vanilla health to full when limited natural regen is saturated.
+        // That used to stop Regeneration potions and other external heals from applying,
+        // while body parts remained stuck around naturalRegenLimitRatio (e.g. 85% -> 34/40).
+        // LIMITED/LIMITED2 still only cap food natural regen in HealthDistribution.applyNaturalRegen.
         if (isCriticalDowned() && hasCriticalPartCollapsed() && !hasAllCriticalPartsCollapsed()) {
             return Math.max(1.0F, scaledHealth);
         }
