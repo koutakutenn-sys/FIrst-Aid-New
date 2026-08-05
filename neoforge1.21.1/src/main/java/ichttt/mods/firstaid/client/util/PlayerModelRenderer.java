@@ -18,17 +18,26 @@
 
 package ichttt.mods.firstaid.client.util;
 
+import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.FirstAidConfig;
 import ichttt.mods.firstaid.api.damagesystem.AbstractDamageablePart;
 import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
 import ichttt.mods.firstaid.common.util.CommonUtils;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FastColor;
 
 import java.util.Random;
 
+/**
+ * Renders the body-part overlay from {@code simple_health.png} so resource packs can retexture it.
+ */
 public final class PlayerModelRenderer {
+    private static final ResourceLocation HEALTH_RENDER_LOCATION =
+            ResourceLocation.fromNamespaceAndPath(FirstAid.MODID, "textures/gui/simple_health.png");
+    private static final int TEXTURE_SIZE = 256;
+    private static final int STATE_WIDTH = 32;
     private static final Random RANDOM = new Random();
 
     private static int angle;
@@ -41,9 +50,9 @@ public final class PlayerModelRenderer {
     public static void renderPlayerHealth(int xOffset, int yOffset, AbstractPlayerDamageModel damageModel, boolean fourColors, GuiGraphics guiGraphics, boolean flashState, float alpha, float partialTicks) {
         int renderX = xOffset + 8;
         int renderY = yOffset + 8;
+        int flashYOffset = flashState ? 64 : 0;
         int opacity = Math.max(64, Math.min(255, 255 - Math.round(alpha)));
-        int borderColor = FastColor.ARGB32.color(opacity, 0, 0, 0);
-        int deadColor = FastColor.ARGB32.color(opacity, 60, 60, 60);
+        int color = FastColor.ARGB32.color(opacity, 255, 255, 255);
 
         if (FirstAidConfig.CLIENT.enableEasterEggs.get() && (EventCalendar.isAFDay() || EventCalendar.isHalloween())) {
             float renderAngle = angle;
@@ -58,55 +67,47 @@ public final class PlayerModelRenderer {
             }
         }
 
-        drawPart(guiGraphics, damageModel.HEAD, renderX + 8, renderY, 16, 16, borderColor, deadColor, fourColors, flashState, opacity);
-        drawPart(guiGraphics, damageModel.BODY, renderX + 8, renderY + 16, 16, 24, borderColor, deadColor, fourColors, flashState, opacity);
-        drawPart(guiGraphics, damageModel.LEFT_ARM, renderX, renderY + 16, 8, 24, borderColor, deadColor, fourColors, flashState, opacity);
-        drawPart(guiGraphics, damageModel.RIGHT_ARM, renderX + 24, renderY + 16, 8, 24, borderColor, deadColor, fourColors, flashState, opacity);
-        drawPart(guiGraphics, damageModel.LEFT_LEG, renderX + 8, renderY + 40, 8, 16, borderColor, deadColor, fourColors, flashState, opacity);
-        drawPart(guiGraphics, damageModel.RIGHT_LEG, renderX + 16, renderY + 40, 8, 16, borderColor, deadColor, fourColors, flashState, opacity);
-        drawPart(guiGraphics, damageModel.LEFT_FOOT, renderX + 8, renderY + 56, 8, 8, borderColor, deadColor, fourColors, flashState, opacity);
-        drawPart(guiGraphics, damageModel.RIGHT_FOOT, renderX + 16, renderY + 56, 8, 8, borderColor, deadColor, fourColors, flashState, opacity);
+        drawPart(guiGraphics, fourColors, damageModel.HEAD, renderX + 8, renderY, 8, flashYOffset, 16, 16, color);
+        drawPart(guiGraphics, fourColors, damageModel.BODY, renderX + 8, renderY + 16, 8, flashYOffset + 16, 16, 24, color);
+        drawPart(guiGraphics, fourColors, damageModel.LEFT_ARM, renderX, renderY + 16, 0, flashYOffset + 16, 8, 24, color);
+        drawPart(guiGraphics, fourColors, damageModel.RIGHT_ARM, renderX + 24, renderY + 16, 24, flashYOffset + 16, 8, 24, color);
+        drawPart(guiGraphics, fourColors, damageModel.LEFT_LEG, renderX + 8, renderY + 40, 8, flashYOffset + 40, 8, 16, color);
+        drawPart(guiGraphics, fourColors, damageModel.RIGHT_LEG, renderX + 16, renderY + 40, 16, flashYOffset + 40, 8, 16, color);
+        drawPart(guiGraphics, fourColors, damageModel.LEFT_FOOT, renderX + 8, renderY + 56, 8, flashYOffset + 56, 8, 8, color);
+        drawPart(guiGraphics, fourColors, damageModel.RIGHT_FOOT, renderX + 16, renderY + 56, 16, flashYOffset + 56, 8, 8, color);
     }
 
-    private static void drawPart(GuiGraphics guiGraphics, AbstractDamageablePart part, int x, int y, int width, int height, int borderColor, int deadColor, boolean fourColors, boolean flashState, int opacity) {
-        int fillColor = getColor(part, fourColors, opacity);
+    private static void drawPart(GuiGraphics guiGraphics, boolean fourColors, AbstractDamageablePart part,
+                                 int screenX, int screenY, int texX, int texY, int width, int height, int color) {
+        int stateTexX = texX + STATE_WIDTH * getState(part, fourColors);
+        HealthRenderUtils.blit(guiGraphics, HEALTH_RENDER_LOCATION, TEXTURE_SIZE, TEXTURE_SIZE,
+                screenX, screenY, stateTexX, texY, width, height, color);
+    }
+
+    private static int getState(AbstractDamageablePart part, boolean fourColors) {
         if (part.currentHealth <= 0.001F) {
-            fillColor = deadColor;
+            return 5;
         }
-
-        if (flashState && part.currentHealth > 0.001F) {
-            fillColor = brighten(fillColor, 1.2F);
+        int maxHealth = part.getMaxHealth();
+        float visualHealth = CommonUtils.getVisualHealth(part);
+        if (Math.abs(visualHealth - maxHealth) < 0.001F) {
+            return 0;
         }
-
-        guiGraphics.fill(x, y, x + width, y + height, borderColor);
-        guiGraphics.fill(x + 1, y + 1, x + width - 1, y + height - 1, fillColor);
-    }
-
-    private static int getColor(AbstractDamageablePart part, boolean fourColors, int opacity) {
-        if (part.currentHealth <= 0.001F) {
-            return FastColor.ARGB32.color(opacity, 60, 60, 60);
+        float healthPercentage = visualHealth / maxHealth;
+        if (healthPercentage >= 1 || healthPercentage <= 0) {
+            FirstAid.LOGGER.error("Calculated invalid health for part {} with current health {} and max health {}. Got value {}",
+                    part.part, part.currentHealth, maxHealth, healthPercentage);
         }
-
-        float percent = CommonUtils.getVisibleHealthRatio(part);
-
-        if (percent > 0.85F) {
-            return FastColor.ARGB32.color(opacity, 60, 220, 60);
+        if (!fourColors && healthPercentage > 0.75F) {
+            return 1;
         }
-        if (percent > 0.65F) {
-            return FastColor.ARGB32.color(opacity, 180, 235, 60);
+        if (healthPercentage > 0.5F) {
+            return 2;
         }
-        if (percent > 0.4F) {
-            return FastColor.ARGB32.color(opacity, 245, 140, 60);
+        if (!fourColors && healthPercentage > 0.25F) {
+            return 3;
         }
-        return FastColor.ARGB32.color(opacity, 235, 70, 60);
-    }
-
-    private static int brighten(int color, float factor) {
-        int alpha = FastColor.ARGB32.alpha(color);
-        int red = Math.min(255, Math.round(FastColor.ARGB32.red(color) * factor));
-        int green = Math.min(255, Math.round(FastColor.ARGB32.green(color) * factor));
-        int blue = Math.min(255, Math.round(FastColor.ARGB32.blue(color) * factor));
-        return FastColor.ARGB32.color(alpha, red, green, blue);
+        return 4;
     }
 
     public static void tickFun() {
