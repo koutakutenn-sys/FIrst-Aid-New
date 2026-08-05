@@ -200,7 +200,10 @@ public class FirstAid {
         NETWORKING.registerMessage(++i, MessageSyncDamageModel.class, MessageSyncDamageModel::encode, MessageSyncDamageModel::new, (message, supplier) -> MessageSyncDamageModel.Handler.onMessage(message, supplier));
         NETWORKING.registerMessage(++i, MessageSyncCommandSettings.class, MessageSyncCommandSettings::encode, MessageSyncCommandSettings::new, (message, supplier) -> MessageSyncCommandSettings.Handler.onMessage(message, supplier));
 
-        event.enqueueWork(() -> PRCompatManager.init());
+        event.enqueueWork(() -> {
+            PRCompatManager.init();
+            ichttt.mods.firstaid.common.compat.parcool.ParCoolCompat.init();
+        });
     }
 
     public void registerCapability(RegisterCapabilitiesEvent event) {

@@ -65,10 +65,20 @@ public final class ClientEventHandler {
 
    public static void register() {
       ClientTickEvents.START_CLIENT_TICK.register(ClientEventHandler::clientTick);
+      ClientTickEvents.END_CLIENT_TICK.register(ClientEventHandler::clientTickEnd);
       ClientPlayConnectionEvents.JOIN.register((Join)(handler, sender, client) -> onLogin(client));
       ClientPlayConnectionEvents.DISCONNECT.register((Disconnect)(handler, client) -> onDisconnect());
       ItemTooltipCallback.EVENT.register(ClientEventHandler::tooltipItems);
       ClientPreAttackCallback.EVENT.register(ClientEventHandler::onPreAttack);
+   }
+
+   private static void clientTickEnd(Minecraft mc) {
+      if (mc.level == null || mc.player == null || mc.isPaused()) {
+         return;
+      }
+      if (isUnconscious(mc.player)) {
+         clearUnconsciousClientInput(mc.player);
+      }
    }
 
    private static void clientTick(Minecraft mc) {
@@ -219,6 +229,22 @@ public final class ClientEventHandler {
       return damageModel instanceof PlayerDamageModel playerDamageModel
          ? playerDamageModel.isUnconscious()
          : damageModel != null && damageModel.getUnconsciousTicks() > 0;
+   }
+
+   private static void clearUnconsciousClientInput(net.minecraft.client.player.LocalPlayer player) {
+      net.minecraft.client.player.ClientInput input = player.input;
+      if (input != null) {
+         // 26.x uses immutable keyPresses + move vector instead of the old mutable Input fields.
+         input.keyPresses = net.minecraft.world.entity.player.Input.EMPTY;
+      }
+      player.xxa = 0.0F;
+      player.zza = 0.0F;
+      player.setSprinting(false);
+      player.setJumping(false);
+      var motion = player.getDeltaMovement();
+      if (motion.x != 0.0D || motion.z != 0.0D) {
+         player.setDeltaMovement(0.0D, motion.y, 0.0D);
+      }
    }
 
    public static float getGiveUpHoldProgress(float partialTick) {

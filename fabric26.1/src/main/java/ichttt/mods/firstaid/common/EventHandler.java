@@ -275,6 +275,7 @@ public final class EventHandler {
 
                   if (playerDamageModel.isUnconscious()) {
                      clearAttackTargetsAround(player, 24.0);
+                     restrictUnconsciousMovement(player);
                   }
                }
 
@@ -548,6 +549,22 @@ public final class EventHandler {
    private static boolean isUnconscious(Player player, boolean allowCreate) {
       return (allowCreate ? CommonUtils.getDamageModel(player) : CommonUtils.getExistingDamageModel(player)) instanceof PlayerDamageModel playerDamageModel
          && playerDamageModel.isUnconscious();
+   }
+
+   /**
+    * Stops vanilla and most ability-mod mobility while the player is downed.
+    * Clears sprint and cancels horizontal impulse so actions like Parcool dodge cannot move the body.
+    */
+   private static void restrictUnconsciousMovement(Player player) {
+      player.setSprinting(false);
+      player.setJumping(false);
+      Vec3 motion = player.getDeltaMovement();
+      if (motion.x != 0.0D || motion.z != 0.0D) {
+         player.setDeltaMovement(0.0D, motion.y, 0.0D);
+      }
+      player.xxa = 0.0F;
+      player.zza = 0.0F;
+      player.yya = 0.0F;
    }
 
    private static boolean isProtectedUnconsciousSuffocation(AbstractPlayerDamageModel damageModel, DamageSource source) {

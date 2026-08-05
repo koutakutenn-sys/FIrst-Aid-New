@@ -42,10 +42,13 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.util.StringUtil;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.player.Input;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.CalculatePlayerTurnEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
@@ -96,6 +99,11 @@ public class ClientEventHandler {
         }
         if (mc.isPaused()) {
             return;
+        }
+
+        // Clear keys before ability mods (ParCool) sample input this tick.
+        if (isUnconscious(mc.player)) {
+            clearUnconsciousClientInput(mc.player);
         }
 
         if (!mc.options.keyUse.isDown()) {
@@ -158,6 +166,18 @@ public class ClientEventHandler {
             if (mc.screen == null) {
                 onShowWoundsPressed(mc);
             }
+        }
+    }
+
+    @SubscribeEvent
+    public static void clientTickPost(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null || mc.isPaused()) {
+            return;
+        }
+        // Run after input is processed so ability mods cannot read stale movement keys while downed.
+        if (isUnconscious(mc.player)) {
+            clearUnconsciousClientInput(mc.player);
         }
     }
 
@@ -493,6 +513,52 @@ public class ClientEventHandler {
         return damageModel instanceof PlayerDamageModel playerDamageModel
                 ? playerDamageModel.isUnconscious()
                 : damageModel != null && damageModel.getUnconsciousTicks() > 0;
+    }
+
+    /**
+     * Clears local movement input and ability-mod keybinds so parkour systems cannot arm/start while downed.
+     */
+    private static void clearUnconsciousClientInput(LocalPlayer player) {
+        Input input = player.input;
+        if (input != null) {
+            input.leftImpulse = 0.0F;
+            input.forwardImpulse = 0.0F;
+            input.up = false;
+            input.down = false;
+            input.left = false;
+            input.right = false;
+            input.jumping = false;
+            input.shiftKeyDown = false;
+        }
+        player.setSprinting(false);
+        player.setJumping(false);
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.options != null) {
+            mc.options.keyUp.setDown(false);
+            mc.options.keyDown.setDown(false);
+            mc.options.keyLeft.setDown(false);
+            mc.options.keyRight.setDown(false);
+            mc.options.keyJump.setDown(false);
+            mc.options.keySprint.setDown(false);
+            for (net.minecraft.client.KeyMapping keyMapping : mc.options.keyMappings) {
+                String name = keyMapping.getName();
+                String category = keyMapping.getCategory();
+                if ((name != null && name.toLowerCase(Locale.ROOT).contains("parcool"))
+                        || (category != null && category.toLowerCase(Locale.ROOT).contains("parcool"))) {
+                    keyMapping.setDown(false);
+                }
+            }
+        }
+
+        Vec3 motion = player.getDeltaMovement();
+        double y = Math.min(0.0D, motion.y);
+        if (motion.x != 0.0D || motion.z != 0.0D || motion.y > 0.0D) {
+            player.setDeltaMovement(0.0D, y, 0.0D);
+        }
+        player.xxa = 0.0F;
+        player.zza = 0.0F;
+        player.yya = 0.0F;
     }
 
     private static void retryDamageModelSync(Minecraft mc) {

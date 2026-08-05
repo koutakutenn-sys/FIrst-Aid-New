@@ -215,6 +215,9 @@ public class FirstAid {
             LOGGER.warn("Disable debug in firstaid config");
         }
 
-        event.enqueueWork(() -> PRCompatManager.init());
+        event.enqueueWork(() -> {
+            PRCompatManager.init();
+            ichttt.mods.firstaid.common.compat.parcool.ParCoolCompat.init();
+        });
     }
 }

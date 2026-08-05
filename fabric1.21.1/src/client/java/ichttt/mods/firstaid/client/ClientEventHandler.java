@@ -65,10 +65,20 @@ public final class ClientEventHandler {
 
    public static void register() {
       ClientTickEvents.START_CLIENT_TICK.register(ClientEventHandler::clientTick);
+      ClientTickEvents.END_CLIENT_TICK.register(ClientEventHandler::clientTickEnd);
       ClientPlayConnectionEvents.JOIN.register((Join)(handler, sender, client) -> onLogin(client));
       ClientPlayConnectionEvents.DISCONNECT.register((Disconnect)(handler, client) -> onDisconnect());
       ItemTooltipCallback.EVENT.register(ClientEventHandler::tooltipItems);
       ClientPreAttackCallback.EVENT.register(ClientEventHandler::onPreAttack);
+   }
+
+   private static void clientTickEnd(Minecraft mc) {
+      if (mc.level == null || mc.player == null || mc.isPaused()) {
+         return;
+      }
+      if (isUnconscious(mc.player)) {
+         clearUnconsciousClientInput(mc.player);
+      }
    }
 
    private static void clientTick(Minecraft mc) {
@@ -78,6 +88,9 @@ public final class ClientEventHandler {
          requireUseReleaseBeforeHealingSelection = false;
          ItemMedicine.clearAllClientReuseBlocks();
       } else if (!mc.isPaused()) {
+         if (isUnconscious(mc.player)) {
+            clearUnconsciousClientInput(mc.player);
+         }
          if (!mc.options.keyUse.isDown()) {
             requireUseReleaseBeforeHealingSelection = false;
             ItemMedicine.clearClientReuseBlock(mc.player);
@@ -220,6 +233,49 @@ public final class ClientEventHandler {
       return damageModel instanceof PlayerDamageModel playerDamageModel
          ? playerDamageModel.isUnconscious()
          : damageModel != null && damageModel.getUnconsciousTicks() > 0;
+   }
+
+   private static void clearUnconsciousClientInput(net.minecraft.client.player.LocalPlayer player) {
+      net.minecraft.client.player.Input input = player.input;
+      if (input != null) {
+         input.leftImpulse = 0.0F;
+         input.forwardImpulse = 0.0F;
+         input.up = false;
+         input.down = false;
+         input.left = false;
+         input.right = false;
+         input.jumping = false;
+         input.shiftKeyDown = false;
+      }
+      player.setSprinting(false);
+      player.setJumping(false);
+
+      Minecraft mc = Minecraft.getInstance();
+      if (mc.options != null) {
+         mc.options.keyUp.setDown(false);
+         mc.options.keyDown.setDown(false);
+         mc.options.keyLeft.setDown(false);
+         mc.options.keyRight.setDown(false);
+         mc.options.keyJump.setDown(false);
+         mc.options.keySprint.setDown(false);
+         for (net.minecraft.client.KeyMapping keyMapping : mc.options.keyMappings) {
+            String name = keyMapping.getName();
+            String category = keyMapping.getCategory();
+            if ((name != null && name.toLowerCase(java.util.Locale.ROOT).contains("parcool"))
+               || (category != null && category.toLowerCase(java.util.Locale.ROOT).contains("parcool"))) {
+               keyMapping.setDown(false);
+            }
+         }
+      }
+
+      net.minecraft.world.phys.Vec3 motion = player.getDeltaMovement();
+      double y = Math.min(0.0D, motion.y);
+      if (motion.x != 0.0D || motion.z != 0.0D || motion.y > 0.0D) {
+         player.setDeltaMovement(0.0D, y, 0.0D);
+      }
+      player.xxa = 0.0F;
+      player.zza = 0.0F;
+      player.yya = 0.0F;
    }
 
    public static float getGiveUpHoldProgress(float partialTick) {
