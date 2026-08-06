@@ -24,6 +24,7 @@ import ichttt.mods.firstaid.api.healing.ItemHealing;
 import ichttt.mods.firstaid.common.damagesystem.PartHealer;
 import ichttt.mods.firstaid.common.items.ItemAdrenalineInjector;
 import ichttt.mods.firstaid.common.items.ItemMorphine;
+import ichttt.mods.firstaid.common.items.ItemMorphineInjector;
 import ichttt.mods.firstaid.common.items.ItemPainkillers;
 import ichttt.mods.firstaid.common.potion.FirstAidPotion;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
@@ -45,6 +46,7 @@ public final class RegistryObjects {
     public static final RegistryEntry<ItemHealing> PLASTER;
     public static final RegistryEntry<Item> DEFIBRILLATOR;
     public static final RegistryEntry<ItemAdrenalineInjector> ADRENALINE_INJECTOR;
+    public static final RegistryEntry<ItemMorphineInjector> MORPHINE_INJECTOR;
     public static final RegistryEntry<ItemMorphine> MORPHINE;
     public static final RegistryEntry<ItemPainkillers> PAINKILLERS;
 
@@ -57,6 +59,10 @@ public final class RegistryObjects {
 
     public static final Holder<MobEffect> MORPHINE_EFFECT;
     public static final Holder<MobEffect> PAINKILLER_EFFECT;
+    public static final Holder<MobEffect> ADDICTION_INCREASE_EFFECT;
+    public static final Holder<MobEffect> ADDICTION_ULTRA_INCREASE_EFFECT;
+    public static final Holder<MobEffect> ADDICTION_DECREASE_EFFECT;
+    public static final Holder<MobEffect> ADDICTION_WITHDRAWAL_EFFECT;
     public static final Holder<MobEffect> POISON_PATCHED;
 
     public static final Holder<CreativeModeTab> CREATIVE_TAB;
@@ -97,11 +103,24 @@ public final class RegistryObjects {
         ));
         DEFIBRILLATOR = registerItem("defibrillator", new Item(itemProperties("defibrillator").durability(3)));
         ADRENALINE_INJECTOR = registerItem("adrenaline_injector", new ItemAdrenalineInjector(itemProperties("adrenaline_injector").durability(2)));
+        MORPHINE_INJECTOR = registerItem("morphine_injector", new ItemMorphineInjector(itemProperties("morphine_injector").durability(2)));
         MORPHINE = registerItem("morphine", new ItemMorphine(itemProperties("morphine")));
         PAINKILLERS = registerItem("painkillers", new ItemPainkillers(itemProperties("painkillers")));
 
         MORPHINE_EFFECT = Registry.registerForHolder(BuiltInRegistries.MOB_EFFECT, id("morphine"), new FirstAidPotion(MobEffectCategory.BENEFICIAL, 0xDDD));
         PAINKILLER_EFFECT = Registry.registerForHolder(BuiltInRegistries.MOB_EFFECT, id("painkiller"), new FirstAidPotion(MobEffectCategory.BENEFICIAL, 0x6EC5FF));
+        ADDICTION_INCREASE_EFFECT = Registry.registerForHolder(
+                BuiltInRegistries.MOB_EFFECT, id("addiction_increase"), new FirstAidPotion(MobEffectCategory.HARMFUL, 0xE8A0A0)
+        );
+        ADDICTION_ULTRA_INCREASE_EFFECT = Registry.registerForHolder(
+                BuiltInRegistries.MOB_EFFECT, id("addiction_ultra_increase"), new FirstAidPotion(MobEffectCategory.HARMFUL, 0xFF6A6A)
+        );
+        ADDICTION_DECREASE_EFFECT = Registry.registerForHolder(
+                BuiltInRegistries.MOB_EFFECT, id("addiction_decrease"), new FirstAidPotion(MobEffectCategory.BENEFICIAL, 0x90C090)
+        );
+        ADDICTION_WITHDRAWAL_EFFECT = Registry.registerForHolder(
+                BuiltInRegistries.MOB_EFFECT, id("addiction"), new FirstAidPotion(MobEffectCategory.HARMFUL, 0xC8A2C8)
+        );
         POISON_PATCHED = MobEffects.POISON;
 
         CREATIVE_TAB = Registry.registerForHolder(BuiltInRegistries.CREATIVE_MODE_TAB, id("main_tab"), FabricItemGroup.builder()
@@ -112,6 +131,7 @@ public final class RegistryObjects {
                     entries.accept(PLASTER.get());
                     entries.accept(DEFIBRILLATOR.get());
                     entries.accept(ADRENALINE_INJECTOR.get());
+                    entries.accept(MORPHINE_INJECTOR.get());
                     entries.accept(MORPHINE.get());
                     entries.accept(PAINKILLERS.get());
                 })

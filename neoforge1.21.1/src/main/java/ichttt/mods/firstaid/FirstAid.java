@@ -60,9 +60,12 @@ public class FirstAid {
 
     public static final SimpleFirstAidChannel NETWORKING = new SimpleFirstAidChannel();
     public static boolean isSynced = false;
-    public static boolean dynamicPainEnabled = false;
+    public static boolean dynamicPainEnabled = true;
     public static int mildPainLevel = 1;
+    /** Hit-frequency red edge pulse. */
     public static boolean enablePainVignette = true;
+    /** Radial pain / weak suppression warp. */
+    public static boolean enablePainBlur = true;
     public static boolean enablePainFovCompression = true;
     public static boolean enablePainAudioEffects = true;
     public static boolean lowSuppressionEnabled = false;
@@ -201,6 +204,7 @@ public class FirstAid {
             event.accept(RegistryObjects.PLASTER);
             event.accept(RegistryObjects.DEFIBRILLATOR);
             event.accept(RegistryObjects.ADRENALINE_INJECTOR);
+            event.accept(RegistryObjects.MORPHINE_INJECTOR);
             event.accept(RegistryObjects.MORPHINE);
             event.accept(RegistryObjects.PAINKILLERS);
         }

@@ -31,9 +31,12 @@ public final class FirstAid {
    private static final Identifier SPLASH_POTION_ENTITY_ID = Identifier.fromNamespaceAndPath("minecraft", "splash_potion");
    private static final Identifier LINGERING_POTION_ENTITY_ID = Identifier.fromNamespaceAndPath("minecraft", "lingering_potion");
    public static boolean isSynced = false;
-   public static boolean dynamicPainEnabled = false;
+   public static boolean dynamicPainEnabled = true;
    public static int mildPainLevel = 1;
-   public static boolean enablePainVignette = true;
+   /** Hit-frequency red edge pulse. */
+    public static boolean enablePainVignette = true;
+    /** Radial pain / weak suppression warp. */
+    public static boolean enablePainBlur = true;
    public static boolean enablePainFovCompression = true;
    public static boolean enablePainAudioEffects = true;
    public static boolean lowSuppressionEnabled = false;

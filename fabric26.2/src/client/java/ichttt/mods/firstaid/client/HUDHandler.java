@@ -85,7 +85,8 @@ public class HUDHandler implements IdentifiableResourceReloadListener, ResourceM
                         int yOffset = (Integer)FirstAidConfig.CLIENT.yOffset.get();
                         OverlayMode overlayMode = (OverlayMode)FirstAidConfig.CLIENT.overlayMode.get();
                         boolean playerModel = overlayMode.isPlayerModel();
-                        int summaryLineCount = playerModel ? StatusSummaryRenderer.countVisibleLines(damageModel, minecraft.player) : 0;
+                        boolean showIndicators = playerModel && !FirstAidConfig.CLIENT.hidePlayerModelIndicators.get();
+        int summaryLineCount = showIndicators ? StatusSummaryRenderer.countVisibleLines(damageModel, minecraft.player) : 0;
                         int summaryHeight = summaryLineCount > 0 ? PLAYER_MODEL_SUMMARY_PADDING + summaryLineCount * SUMMARY_LINE_HEIGHT : 0;
                         int playerModelHeight = PLAYER_MODEL_HEIGHT + summaryHeight;
                         switch ((Position)FirstAidConfig.CLIENT.pos.get()) {
@@ -135,7 +136,7 @@ public class HUDHandler implements IdentifiableResourceReloadListener, ResourceM
                               ((Integer)FirstAidConfig.CLIENT.alpha.get()).intValue(),
                               deltaTracker.getGameTimeDeltaPartialTick(false)
                            );
-                           StatusSummaryRenderer.renderStatusSummary(
+                           if (showIndicators) StatusSummaryRenderer.renderStatusSummary(
                               guiGraphics,
                               minecraft.font,
                               minecraft.player,

@@ -51,12 +51,15 @@ public final class FirstAid {
     private static final ResourceLocation LINGERING_POTION_ENTITY_ID = ResourceLocation.fromNamespaceAndPath("minecraft", "lingering_potion");
 
     public static boolean isSynced = false;
-    public static boolean dynamicPainEnabled = false;
+    public static boolean dynamicPainEnabled = true;
     public static int mildPainLevel = 1;
     public static boolean lowSuppressionEnabled = false;
     public static boolean projectileSuppressionEnabled = true;
     public static float lowSuppressionMultiplier = 0.4F;
+    /** Hit-frequency red edge pulse. */
     public static boolean enablePainVignette = true;
+    /** Radial pain / weak suppression warp. */
+    public static boolean enablePainBlur = true;
     public static boolean enablePainFovCompression = true;
     public static boolean enablePainAudioEffects = true;
     public static boolean rescueWakeUpEnabled = true;

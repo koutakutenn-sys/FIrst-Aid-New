@@ -50,14 +50,22 @@ public class ItemMorphine extends ItemMedicine {
     }
 
     @Override
-    public SoundEvent getUseLoopSound(ItemStack stack) {
+    public SoundEvent getUseStartSound(ItemStack stack) {
+        // Play once on start; looping the full pill clip caused repeated playback mid-use.
         return RegistryObjects.PILLS_USE.get();
     }
 
     @Override
+    public SoundEvent getUseLoopSound(ItemStack stack) {
+        return null;
+    }
+
+    @Override
     public MedicineStatusDisplay getActiveStatus(MedicineStatusContext context) {
+        // Shared status id with injector so only one morphine line is shown.
         int morphineTicks = context.getDamageModel() == null ? 0 : context.getDamageModel().getMorphineTicks();
-        return morphineTicks > 0
+        // Hide sub-second leftovers (would display as 00:00 and look "stuck").
+        return morphineTicks >= 20
                 ? new MedicineStatusDisplay(
                         STATUS_ID,
                         Component.translatable("firstaid.gui.morphine_left", StringUtil.formatTickDuration(morphineTicks)),
@@ -75,7 +83,12 @@ public class ItemMorphine extends ItemMedicine {
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
         tooltipComponents.add(
-                Component.translatable("firstaid.tooltip.morphine", StringUtil.formatTickDuration(PlayerDamageModel.getMorphineActivationDelay()), "7:30-8:30")
+                Component.translatable(
+                                "firstaid.tooltip.morphine",
+                                StringUtil.formatTickDuration(PlayerDamageModel.getMorphineActivationDelay()),
+                                "7:30-8:30",
+                                StringUtil.formatTickDuration(PlayerDamageModel.MORPHINE_ORAL_REGEN_TICKS)
+                        )
                         .withStyle(ChatFormatting.GRAY)
         );
     }

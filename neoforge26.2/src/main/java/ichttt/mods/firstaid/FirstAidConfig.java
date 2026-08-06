@@ -63,6 +63,7 @@ public class FirstAidConfig {
         FirstAid.dynamicPainEnabled = SERVER.dynamicPainEnabled.get();
         FirstAid.mildPainLevel = SERVER.mildPainLevel.get();
         FirstAid.enablePainVignette = SERVER.enablePainVignette.get();
+        FirstAid.enablePainBlur = SERVER.enablePainBlur.get();
         FirstAid.enablePainFovCompression = SERVER.enablePainFovCompression.get();
         FirstAid.enablePainAudioEffects = SERVER.enablePainAudioEffects.get();
         FirstAid.lowSuppressionEnabled = SERVER.lowSuppressionEnabled.get();
@@ -93,6 +94,7 @@ public class FirstAidConfig {
         SERVER.dynamicPainEnabled.set(FirstAid.dynamicPainEnabled);
         SERVER.mildPainLevel.set(FirstAid.mildPainLevel);
         SERVER.enablePainVignette.set(FirstAid.enablePainVignette);
+        SERVER.enablePainBlur.set(FirstAid.enablePainBlur);
         SERVER.enablePainFovCompression.set(FirstAid.enablePainFovCompression);
         SERVER.enablePainAudioEffects.set(FirstAid.enablePainAudioEffects);
         SERVER.lowSuppressionEnabled.set(FirstAid.lowSuppressionEnabled);
@@ -338,13 +340,16 @@ public class FirstAidConfig {
             builder.push("Command Settings");
             dynamicPainEnabled = builder
                     .comment("Persistent toggle for /firstaid pain (dynamic vs mild)")
-                    .define("dynamicPainEnabled", false);
+                    .define("dynamicPainEnabled", true);
             mildPainLevel = builder
                     .comment("Pain level used when /firstaid pain mild is active")
                     .defineInRange("mildPainLevel", 1, 1, 5);
             enablePainVignette = builder
-                    .comment("Enable red screen vignette overlay when in pain")
+                    .comment("Enable hit-frequency red edge pulse (stacks on each hit, decays when safe)")
                     .define("enablePainVignette", true);
+            enablePainBlur = builder
+                    .comment("Enable radial pain blur / weak suppression warp post-processing")
+                    .define("enablePainBlur", true);
             enablePainFovCompression = builder
                     .comment("Enable FOV compression (tunnel vision) when in pain")
                     .define("enablePainFovCompression", true);
@@ -381,6 +386,15 @@ public class FirstAidConfig {
             adrenalineUseDuration = builder
                     .comment("Use duration of adrenaline injector in ticks (20 ticks = 1 second)")
                     .defineInRange("adrenalineUseDuration", 40, 1, 72000);
+            morphineInjectorUseDuration = builder
+                    .comment("Use duration of morphine injector in ticks (20 ticks = 1 second)")
+                    .defineInRange("morphineInjectorUseDuration", 40, 1, 72000);
+            criticalCrawlEnabled = builder
+                    .comment("Allow slow crawling during the first 60% of critical downed time")
+                    .define("criticalCrawlEnabled", true);
+            addictionEnabled = builder
+                    .comment("Enable opioid addiction gain, decay, and episodic withdrawal")
+                    .define("addictionEnabled", true);
             naturalRegenLimitRatio = builder
                     .comment("Maximum health fraction natural regeneration can restore in limited modes")
                     .defineInRange("naturalRegenLimitRatio", 0.85D, 0D, 1D);
@@ -504,6 +518,7 @@ public class FirstAidConfig {
         public final ModConfigSpec.BooleanValue dynamicPainEnabled;
         public final ModConfigSpec.IntValue mildPainLevel;
         public final ModConfigSpec.BooleanValue enablePainVignette;
+        public final ModConfigSpec.BooleanValue enablePainBlur;
         public final ModConfigSpec.BooleanValue enablePainFovCompression;
         public final ModConfigSpec.BooleanValue enablePainAudioEffects;
         public final ModConfigSpec.BooleanValue lowSuppressionEnabled;
@@ -516,6 +531,9 @@ public class FirstAidConfig {
         public final ModConfigSpec.IntValue morphineUseDuration;
         public final ModConfigSpec.IntValue painkillersUseDuration;
         public final ModConfigSpec.IntValue adrenalineUseDuration;
+        public final ModConfigSpec.IntValue morphineInjectorUseDuration;
+        public final ModConfigSpec.BooleanValue criticalCrawlEnabled;
+        public final ModConfigSpec.BooleanValue addictionEnabled;
         public final ModConfigSpec.DoubleValue naturalRegenLimitRatio;
         public final ModConfigSpec.DoubleValue naturalRegenCriticalPriorityRatio;
         public final ModConfigSpec.EnumValue<FirstAid.MedicineEffectMode> medicineEffectMode;
@@ -616,6 +634,7 @@ public class FirstAidConfig {
         public final ModConfigSpec.BooleanValue enableEasterEggs;
         public final ModConfigSpec.IntValue visibleDurationTicks;
         public final ModConfigSpec.BooleanValue flash;
+        public final ModConfigSpec.BooleanValue hidePlayerModelIndicators;
 
         public Client(ModConfigSpec.Builder builder) {
             builder.comment("Client only configuration settings").push("Overlay");
@@ -665,6 +684,11 @@ public class FirstAidConfig {
                     .translation("firstaid.config.flash")
                     .comment("If set to true, the overlay will flash for a short moment if the health changed. Only affects PLAYER_MODEL overlay")
                     .define("flash", true);
+
+            this.hidePlayerModelIndicators = builder
+                    .translation("firstaid.config.hideplayermodelindicators")
+                    .comment("If true, hides status indicator lines under the player-model HUD (pain/suppression/medicine text). Default true.")
+                    .define("hidePlayerModelIndicators", true);
             builder.pop();
 
 

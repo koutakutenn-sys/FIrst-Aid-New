@@ -32,14 +32,20 @@ public class ItemMorphine extends ItemMedicine {
    }
 
    @Override
+   public SoundEvent getUseStartSound(ItemStack stack) {
+      // Play once on start; looping the full pill clip caused repeated playback mid-use.
+      return RegistryObjects.PILLS_USE.value();
+   }
+
+   @Override
    public SoundEvent getUseLoopSound(ItemStack stack) {
-      return (SoundEvent)RegistryObjects.PILLS_USE.value();
+      return null;
    }
 
    @Override
    public MedicineStatusDisplay getActiveStatus(MedicineStatusContext context) {
       int morphineTicks = context.getDamageModel() == null ? 0 : context.getDamageModel().getMorphineTicks();
-      return morphineTicks > 0
+      return morphineTicks >= 20
          ? new MedicineStatusDisplay(
             STATUS_ID, Component.translatable("firstaid.gui.morphine_left", new Object[]{StringUtil.formatTickDuration(morphineTicks, 20.0F)}), null, 16777215
          )

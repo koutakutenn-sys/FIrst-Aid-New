@@ -33,14 +33,20 @@ public class ItemMorphine extends ItemMedicine {
    }
 
    @Override
+   public SoundEvent getUseStartSound(ItemStack stack) {
+      // Play once on start; looping the full pill clip caused repeated playback mid-use.
+      return RegistryObjects.PILLS_USE.value();
+   }
+
+   @Override
    public SoundEvent getUseLoopSound(ItemStack stack) {
-      return (SoundEvent)RegistryObjects.PILLS_USE.value();
+      return null;
    }
 
    @Override
    public MedicineStatusDisplay getActiveStatus(MedicineStatusContext context) {
       int morphineTicks = context.getDamageModel() == null ? 0 : context.getDamageModel().getMorphineTicks();
-      return morphineTicks > 0
+      return morphineTicks >= 20
          ? new MedicineStatusDisplay(
             STATUS_ID, Component.translatable("firstaid.gui.morphine_left", new Object[]{StringUtil.formatTickDuration(morphineTicks, 20.0F)}), null, 16777215
          )
@@ -58,7 +64,10 @@ public class ItemMorphine extends ItemMedicine {
    ) {
       tooltipAdder.accept(
          Component.translatable(
-               "firstaid.tooltip.morphine", new Object[]{StringUtil.formatTickDuration(PlayerDamageModel.getMorphineActivationDelay(), 20.0F), "7:30-8:30"}
+               "firstaid.tooltip.morphine",
+               StringUtil.formatTickDuration(PlayerDamageModel.getMorphineActivationDelay(), 20.0F),
+               "7:30-8:30",
+               StringUtil.formatTickDuration(PlayerDamageModel.MORPHINE_ORAL_REGEN_TICKS, 20.0F)
             )
             .withStyle(ChatFormatting.GRAY)
       );

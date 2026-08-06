@@ -71,6 +71,7 @@ public final class FirstAidConfig {
       FirstAid.dynamicPainEnabled = SERVER.dynamicPainEnabled.get();
       FirstAid.mildPainLevel = SERVER.mildPainLevel.get();
       FirstAid.enablePainVignette = SERVER.enablePainVignette.get();
+        FirstAid.enablePainBlur = SERVER.enablePainBlur.get();
       FirstAid.enablePainFovCompression = SERVER.enablePainFovCompression.get();
       FirstAid.enablePainAudioEffects = SERVER.enablePainAudioEffects.get();
       FirstAid.lowSuppressionEnabled = SERVER.lowSuppressionEnabled.get();
@@ -101,6 +102,7 @@ public final class FirstAidConfig {
       SERVER.dynamicPainEnabled.set(FirstAid.dynamicPainEnabled);
       SERVER.mildPainLevel.set(FirstAid.mildPainLevel);
       SERVER.enablePainVignette.set(FirstAid.enablePainVignette);
+        SERVER.enablePainBlur.set(FirstAid.enablePainBlur);
       SERVER.enablePainFovCompression.set(FirstAid.enablePainFovCompression);
       SERVER.enablePainAudioEffects.set(FirstAid.enablePainAudioEffects);
       SERVER.lowSuppressionEnabled.set(FirstAid.lowSuppressionEnabled);
@@ -361,6 +363,7 @@ public final class FirstAidConfig {
       public final FirstAidConfig.ConfigValue<Boolean> enableEasterEggs;
       public final FirstAidConfig.ConfigValue<Integer> visibleDurationTicks = this.define(FirstAidConfig.intValue("visibleDurationTicks", -1, -1, 600));
       public final FirstAidConfig.ConfigValue<Boolean> flash = this.define(FirstAidConfig.boolValue("flash", true));
+      public final FirstAidConfig.ConfigValue<Boolean> hidePlayerModelIndicators = this.define(FirstAidConfig.boolValue("hidePlayerModelIndicators", true));
 
       public Client() {
          this.enableSounds = this.define(FirstAidConfig.boolValue("enableSoundSystem", true));
@@ -526,6 +529,7 @@ public final class FirstAidConfig {
       public final FirstAidConfig.ConfigValue<Boolean> dynamicPainEnabled;
       public final FirstAidConfig.ConfigValue<Integer> mildPainLevel;
       public final FirstAidConfig.ConfigValue<Boolean> enablePainVignette;
+      public final FirstAidConfig.ConfigValue<Boolean> enablePainBlur;
       public final FirstAidConfig.ConfigValue<Boolean> enablePainFovCompression;
       public final FirstAidConfig.ConfigValue<Boolean> enablePainAudioEffects;
       public final FirstAidConfig.ConfigValue<Boolean> lowSuppressionEnabled;
@@ -536,6 +540,9 @@ public final class FirstAidConfig {
       public final FirstAidConfig.ConfigValue<Integer> morphineUseDuration;
       public final FirstAidConfig.ConfigValue<Integer> painkillersUseDuration;
       public final FirstAidConfig.ConfigValue<Integer> adrenalineUseDuration;
+      public final FirstAidConfig.ConfigValue<Integer> morphineInjectorUseDuration;
+      public final FirstAidConfig.ConfigValue<Boolean> criticalCrawlEnabled;
+      public final FirstAidConfig.ConfigValue<Boolean> addictionEnabled;
       public final FirstAidConfig.ConfigValue<Double> naturalRegenLimitRatio;
       public final FirstAidConfig.ConfigValue<Double> naturalRegenCriticalPriorityRatio;
       public final FirstAidConfig.ConfigValue<FirstAid.MedicineEffectMode> medicineEffectMode;
@@ -602,9 +609,10 @@ public final class FirstAidConfig {
          this.enchMulOverrideMultiplier = this.define(
             FirstAidConfig.intList("enchantmentOverrideMultiplier", Collections.singletonList(2), value -> value >= 0 && value <= 4)
          );
-         this.dynamicPainEnabled = this.define(FirstAidConfig.boolValue("dynamicPainEnabled", false));
+         this.dynamicPainEnabled = this.define(FirstAidConfig.boolValue("dynamicPainEnabled", true));
          this.mildPainLevel = this.define(FirstAidConfig.intValue("mildPainLevel", 1, 1, 5));
          this.enablePainVignette = this.define(FirstAidConfig.boolValue("enablePainVignette", true));
+         this.enablePainBlur = this.define(FirstAidConfig.boolValue("enablePainBlur", true));
          this.enablePainFovCompression = this.define(FirstAidConfig.boolValue("enablePainFovCompression", true));
          this.enablePainAudioEffects = this.define(FirstAidConfig.boolValue("enablePainAudioEffects", true));
          this.lowSuppressionEnabled = this.define(FirstAidConfig.boolValue("lowSuppressionEnabled", false));
@@ -617,6 +625,9 @@ public final class FirstAidConfig {
          this.morphineUseDuration = this.define(FirstAidConfig.intValue("morphineUseDuration", 40, 1, 72000));
          this.painkillersUseDuration = this.define(FirstAidConfig.intValue("painkillersUseDuration", 32, 1, 72000));
          this.adrenalineUseDuration = this.define(FirstAidConfig.intValue("adrenalineUseDuration", 40, 1, 72000));
+         this.morphineInjectorUseDuration = this.define(FirstAidConfig.intValue("morphineInjectorUseDuration", 40, 1, 72000));
+         this.criticalCrawlEnabled = this.define(FirstAidConfig.boolValue("criticalCrawlEnabled", true));
+         this.addictionEnabled = this.define(FirstAidConfig.boolValue("addictionEnabled", true));
          this.naturalRegenLimitRatio = this.define(FirstAidConfig.doubleValue("naturalRegenLimitRatio", 0.85, 0.0, 1.0));
          this.naturalRegenCriticalPriorityRatio = this.define(FirstAidConfig.doubleValue("naturalRegenCriticalPriorityRatio", 0.85, 0.0, 1.0));
          this.medicineEffectMode = this.define(

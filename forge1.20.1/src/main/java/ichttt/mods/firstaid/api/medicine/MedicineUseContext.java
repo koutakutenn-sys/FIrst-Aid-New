@@ -80,6 +80,19 @@ public final class MedicineUseContext {
       }
    }
 
+
+   public void applyMorphineInjection() {
+      if (this.damageModel instanceof PlayerDamageModel playerDamageModel) {
+         playerDamageModel.applyMorphineInjection(this.player);
+      } else {
+         int basePainRelief = PlayerDamageModel.getRandMorphineDuration();
+         int painDuration = Math.round(basePainRelief * PlayerDamageModel.MORPHINE_INJECTOR_DURATION_MULTIPLIER);
+         this.player.addEffect(new MobEffectInstance(RegistryObjects.MORPHINE_EFFECT.get(), basePainRelief, 0, false, false));
+         this.player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT.get(), painDuration, 0, false, false));
+         this.player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, PlayerDamageModel.MORPHINE_INJECTOR_REGEN_TICKS, 0, false, false));
+      }
+   }
+
    public void applyAdrenalineInjection() {
       if (this.damageModel instanceof PlayerDamageModel playerDamageModel) {
          playerDamageModel.applyAdrenalineInjection(this.player);

@@ -9,6 +9,8 @@
     "ProjectileMixin"
   ],
   "client": [
+    "client.GameRendererMixin",
+    "client.GameRendererPostAccessor",
     "client.LivingEntityRendererMixin",
     "client.PlayerModelMixin",
     "client.PlayerRendererMixin"

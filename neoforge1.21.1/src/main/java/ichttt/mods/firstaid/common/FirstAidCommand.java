@@ -20,6 +20,7 @@ package ichttt.mods.firstaid.common;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -32,6 +33,7 @@ import ichttt.mods.firstaid.common.util.CommonUtils;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -56,6 +58,16 @@ public final class FirstAidCommand {
                                                 .executes(context -> setPainVignette(context.getSource(), true)))
                                         .then(Commands.literal("off")
                                                 .executes(context -> setPainVignette(context.getSource(), false))))
+                                .then(Commands.literal("hitpulse")
+                                        .then(Commands.literal("on")
+                                                .executes(context -> setPainVignette(context.getSource(), true)))
+                                        .then(Commands.literal("off")
+                                                .executes(context -> setPainVignette(context.getSource(), false))))
+                                .then(Commands.literal("blur")
+                                        .then(Commands.literal("on")
+                                                .executes(context -> setPainBlur(context.getSource(), true)))
+                                        .then(Commands.literal("off")
+                                                .executes(context -> setPainBlur(context.getSource(), false))))
                                 .then(Commands.literal("fov")
                                         .then(Commands.literal("on")
                                                 .executes(context -> setPainFovCompression(context.getSource(), true)))
@@ -131,6 +143,51 @@ public final class FirstAidCommand {
                                 .executes(context -> setCommandTips(context.getSource(), true)))
                         .then(Commands.literal("off")
                                 .executes(context -> setCommandTips(context.getSource(), false)))));
+        dispatcher.register(Commands.literal("firstaid")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("addiction")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .requires(source -> source.hasPermission(2))
+                                .executes(context -> queryAddiction(context.getSource(), EntityArgument.getPlayer(context, "player"))))
+                        .then(Commands.literal("set")
+                                .requires(source -> source.hasPermission(2))
+                                .then(Commands.argument("player", EntityArgument.player())
+                                        .then(Commands.argument("value", FloatArgumentType.floatArg(0.0F, 100.0F))
+                                                .executes(context -> setAddiction(
+                                                        context.getSource(),
+                                                        EntityArgument.getPlayer(context, "player"),
+                                                        FloatArgumentType.getFloat(context, "value"))))))));
+    }
+
+    private static int queryAddiction(CommandSourceStack source, ServerPlayer target) {
+        AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(target);
+        if (!(damageModel instanceof PlayerDamageModel playerDamageModel)) {
+            source.sendFailure(Component.translatable("firstaid.command.addiction.unavailable"));
+            return 0;
+        }
+        float value = playerDamageModel.getAddictionValue();
+        source.sendSuccess(() -> Component.translatable(
+                "firstaid.command.addiction.query",
+                target.getDisplayName(),
+                String.format(java.util.Locale.ROOT, "%.1f", value)
+        ), false);
+        return 1;
+    }
+
+    private static int setAddiction(CommandSourceStack source, ServerPlayer target, float value) {
+        AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(target);
+        if (!(damageModel instanceof PlayerDamageModel playerDamageModel)) {
+            source.sendFailure(Component.translatable("firstaid.command.addiction.unavailable"));
+            return 0;
+        }
+        playerDamageModel.setAddictionValue(value);
+        CommonUtils.syncDamageModel(target);
+        source.sendSuccess(() -> Component.translatable(
+                "firstaid.command.addiction.set",
+                target.getDisplayName(),
+                String.format(java.util.Locale.ROOT, "%.1f", playerDamageModel.getAddictionValue())
+        ), true);
+        return 1;
     }
 
     private static int setCommandTips(CommandSourceStack source, boolean enabled) {
@@ -178,6 +235,14 @@ public final class FirstAidCommand {
                 : "firstaid.command.pain.display.vignette.off"), true);
         return 1;
     }
+    private static int setPainBlur(CommandSourceStack source, boolean enabled) {
+        FirstAid.enablePainBlur = enabled;
+        FirstAidConfig.persistCommandSettings();
+        syncCommandSettings(source);
+        source.sendSuccess(() -> Component.translatable("firstaid.command.pain.display.blur." + (enabled ? "on" : "off")), true);
+        return 1;
+    }
+
 
     private static int setPainFovCompression(CommandSourceStack source, boolean enabled) {
         FirstAid.enablePainFovCompression = enabled;

@@ -24,6 +24,7 @@ import ichttt.mods.firstaid.api.healing.ItemHealing;
 import ichttt.mods.firstaid.common.damagesystem.PartHealer;
 import ichttt.mods.firstaid.common.items.ItemAdrenalineInjector;
 import ichttt.mods.firstaid.common.items.ItemMorphine;
+import ichttt.mods.firstaid.common.items.ItemMorphineInjector;
 import ichttt.mods.firstaid.common.items.ItemPainkillers;
 import ichttt.mods.firstaid.common.potion.FirstAidPotion;
 import net.minecraft.core.Holder;
@@ -51,6 +52,7 @@ public class RegistryObjects {
     public static final DeferredItem<ItemHealing> PLASTER;
     public static final DeferredItem<Item> DEFIBRILLATOR;
     public static final DeferredItem<ItemAdrenalineInjector> ADRENALINE_INJECTOR;
+    public static final DeferredItem<ItemMorphineInjector> MORPHINE_INJECTOR;
     public static final DeferredItem<ItemMorphine> MORPHINE;
     public static final DeferredItem<ItemPainkillers> PAINKILLERS;
 
@@ -63,6 +65,10 @@ public class RegistryObjects {
 
     public static final Holder<MobEffect> MORPHINE_EFFECT;
     public static final Holder<MobEffect> PAINKILLER_EFFECT;
+    public static final Holder<MobEffect> ADDICTION_INCREASE_EFFECT;
+    public static final Holder<MobEffect> ADDICTION_ULTRA_INCREASE_EFFECT;
+    public static final Holder<MobEffect> ADDICTION_DECREASE_EFFECT;
+    public static final Holder<MobEffect> ADDICTION_WITHDRAWAL_EFFECT;
     public static final Holder<MobEffect> POISON_PATCHED;
 
     public static final Holder<CreativeModeTab> CREATIVE_TAB;
@@ -87,6 +93,7 @@ public class RegistryObjects {
         ));
         DEFIBRILLATOR = ITEM_REGISTER.registerItem("defibrillator", properties -> new Item(properties.durability(3)));
         ADRENALINE_INJECTOR = ITEM_REGISTER.registerItem("adrenaline_injector", ItemAdrenalineInjector::new);
+        MORPHINE_INJECTOR = ITEM_REGISTER.registerItem("morphine_injector", ItemMorphineInjector::new);
         MORPHINE = ITEM_REGISTER.registerItem("morphine", ItemMorphine::new);
         PAINKILLERS = ITEM_REGISTER.registerItem("painkillers", ItemPainkillers::new);
 
@@ -111,6 +118,10 @@ public class RegistryObjects {
         // MOB EFFECTS
         MORPHINE_EFFECT = MOB_EFFECT_REGISTER.register("morphine", () -> new FirstAidPotion(MobEffectCategory.BENEFICIAL, 0xDDD));
         PAINKILLER_EFFECT = MOB_EFFECT_REGISTER.register("painkiller", () -> new FirstAidPotion(MobEffectCategory.BENEFICIAL, 0x6EC5FF));
+        ADDICTION_INCREASE_EFFECT = MOB_EFFECT_REGISTER.register("addiction_increase", () -> new FirstAidPotion(MobEffectCategory.HARMFUL, 0xE8A0A0));
+        ADDICTION_ULTRA_INCREASE_EFFECT = MOB_EFFECT_REGISTER.register("addiction_ultra_increase", () -> new FirstAidPotion(MobEffectCategory.HARMFUL, 0xFF6A6A));
+        ADDICTION_DECREASE_EFFECT = MOB_EFFECT_REGISTER.register("addiction_decrease", () -> new FirstAidPotion(MobEffectCategory.BENEFICIAL, 0x90C090));
+        ADDICTION_WITHDRAWAL_EFFECT = MOB_EFFECT_REGISTER.register("addiction", () -> new FirstAidPotion(MobEffectCategory.HARMFUL, 0xC8A2C8));
         POISON_PATCHED = MobEffects.POISON;
 
         // CREATIVE MODE TABS

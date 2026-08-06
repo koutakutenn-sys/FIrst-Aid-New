@@ -116,7 +116,8 @@ public class HUDHandler implements IdentifiableResourceReloadListener, ResourceM
         int yOffset = FirstAidConfig.CLIENT.yOffset.get();
         FirstAidConfig.Client.OverlayMode overlayMode = FirstAidConfig.CLIENT.overlayMode.get();
         boolean playerModel = overlayMode.isPlayerModel();
-        int summaryLineCount = playerModel ? StatusSummaryRenderer.countVisibleLines(damageModel, minecraft.player) : 0;
+        boolean showIndicators = playerModel && !FirstAidConfig.CLIENT.hidePlayerModelIndicators.get();
+        int summaryLineCount = showIndicators ? StatusSummaryRenderer.countVisibleLines(damageModel, minecraft.player) : 0;
         int playerModelHeight = 66 + (summaryLineCount > 0 ? summaryLineCount * 10 + 4 : 0);
         switch (FirstAidConfig.CLIENT.pos.get()) {
             case TOP_RIGHT -> xOffset = minecraft.getWindow().getGuiScaledWidth() - xOffset - (playerModel ? 34 : damageModel.getMaxRenderSize() + maxLength);
@@ -152,7 +153,7 @@ public class HUDHandler implements IdentifiableResourceReloadListener, ResourceM
 
         if (playerModel) {
             PlayerModelRenderer.renderPlayerHealth(xOffset, yOffset, damageModel, overlayMode == FirstAidConfig.Client.OverlayMode.PLAYER_MODEL_4_COLORS, guiGraphics, flashStateManager.update(Util.getMillis()), FirstAidConfig.CLIENT.alpha.get(), deltaTracker.getGameTimeDeltaPartialTick(false));
-            StatusSummaryRenderer.renderStatusSummary(
+            if (showIndicators) StatusSummaryRenderer.renderStatusSummary(
                     guiGraphics,
                     minecraft.font,
                     minecraft.player,

@@ -155,7 +155,8 @@ public class HUDHandler implements ResourceManagerReloadListener, GuiLayer {
         int yOffset = FirstAidConfig.CLIENT.yOffset.get();
         FirstAidConfig.Client.OverlayMode overlayMode = FirstAidConfig.CLIENT.overlayMode.get();
         boolean playerModel = overlayMode.isPlayerModel();
-        int summaryLineCount = playerModel ? StatusSummaryRenderer.countVisibleLines(damageModel, minecraft.player) : 0;
+        boolean showIndicators = playerModel && !FirstAidConfig.CLIENT.hidePlayerModelIndicators.get();
+        int summaryLineCount = showIndicators ? StatusSummaryRenderer.countVisibleLines(damageModel, minecraft.player) : 0;
         int summaryHeight = summaryLineCount > 0 ? PLAYER_MODEL_SUMMARY_PADDING + summaryLineCount * SUMMARY_LINE_HEIGHT : 0;
         int playerModelHeight = PLAYER_MODEL_HEIGHT + summaryHeight;
         switch (FirstAidConfig.CLIENT.pos.get()) {
@@ -204,15 +205,17 @@ public class HUDHandler implements ResourceManagerReloadListener, GuiLayer {
 
         if (playerModel) {
             PlayerModelRenderer.renderPlayerHealth(xOffset, yOffset, damageModel, overlayMode == FirstAidConfig.Client.OverlayMode.PLAYER_MODEL_4_COLORS, guiGraphics, flashStateManager.update(Util.getMillis()), FirstAidConfig.CLIENT.alpha.get(), deltaTracker.getGameTimeDeltaPartialTick(false));
-            StatusSummaryRenderer.renderStatusSummary(
-                    guiGraphics,
-                    minecraft.font,
-                    minecraft.player,
-                    damageModel,
-                    damageModel instanceof PlayerDamageModel playerDamageModel ? playerDamageModel : null,
-                    xOffset,
-                    yOffset + PLAYER_MODEL_SUMMARY_Y
-            );
+            if (showIndicators) {
+                StatusSummaryRenderer.renderStatusSummary(
+                        guiGraphics,
+                        minecraft.font,
+                        minecraft.player,
+                        damageModel,
+                        damageModel instanceof PlayerDamageModel playerDamageModel ? playerDamageModel : null,
+                        xOffset,
+                        yOffset + PLAYER_MODEL_SUMMARY_Y
+                );
+            }
         } else {
             int valueOffset = maxLength + 6;
             int y = yOffset;

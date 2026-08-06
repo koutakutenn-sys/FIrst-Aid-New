@@ -74,10 +74,12 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.*;
 import net.minecraftforge.event.entity.EntityEvent;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
+import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent;
 import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraft.world.item.Items;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.level.SleepFinishedTimeEvent;
@@ -244,7 +246,7 @@ public class EventHandler {
         if (event.phase == TickEvent.Phase.START) {
             AbstractPlayerDamageModel existing = CommonUtils.getDamageModel(event.player);
             if (existing instanceof PlayerDamageModel playerDamageModel && playerDamageModel.isUnconscious()) {
-                restrictUnconsciousMovement(event.player);
+                restrictUnconsciousMovement(event.player, playerDamageModel);
             }
             return;
         }
@@ -258,12 +260,12 @@ public class EventHandler {
                 }
                 if (playerDamageModel.isUnconscious()) {
                     clearAttackTargetsAround(event.player, 24.0D);
-                    restrictUnconsciousMovement(event.player);
+                    restrictUnconsciousMovement(event.player, playerDamageModel);
                 }
             } else if (event.player.level().isClientSide
                     && damageModel instanceof PlayerDamageModel clientModel
                     && clientModel.isUnconscious()) {
-                restrictUnconsciousMovement(event.player);
+                restrictUnconsciousMovement(event.player, clientModel);
             }
             damageModel.tick(event.player.level(), event.player);
             if (!event.player.level().isClientSide && event.player instanceof ServerPlayer serverPlayer) {
@@ -432,6 +434,36 @@ public class EventHandler {
         cancelIfUnconscious(event);
     }
 
+    /**
+     * Milk clears vanilla potion effects, but FirstAid also tracks morphine ticks / pending activation
+     * in the damage model. Clear those so morphine cannot stick at 00:00 after milk.
+     */
+    @SubscribeEvent
+    public static void onFinishUsingItem(LivingEntityUseItemEvent.Finish event) {
+        if (event.getEntity().level().isClientSide) {
+            return;
+        }
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        if (!isMilkConsumption(event.getItem(), player)) {
+            return;
+        }
+        AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(player);
+        if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+            playerDamageModel.clearPainSuppressants(player);
+        }
+    }
+
+    private static boolean isMilkConsumption(ItemStack stack, Player player) {
+        if (stack != null && !stack.isEmpty() && stack.is(Items.MILK_BUCKET)) {
+            return true;
+        }
+        // Some loaders transform the use stack before Finish; fall back to active use item.
+        ItemStack useItem = player.getUseItem();
+        return useItem != null && !useItem.isEmpty() && useItem.is(Items.MILK_BUCKET);
+    }
+
     @SubscribeEvent
     public static void onBlockInteract(PlayerInteractEvent.RightClickBlock event) {
         cancelIfUnconscious(event);
@@ -481,6 +513,7 @@ public class EventHandler {
         FirstAid.dynamicPainEnabled = false;
         FirstAid.mildPainLevel = 1;
         FirstAid.enablePainVignette = true;
+        FirstAid.enablePainBlur = true;
         FirstAid.enablePainFovCompression = true;
         FirstAid.enablePainAudioEffects = true;
         FirstAid.lowSuppressionEnabled = false;
@@ -597,13 +630,32 @@ public class EventHandler {
 
     /**
      * Stops vanilla and ability-mod mobility while the player is downed.
-     * Clears sprint/jump impulse and kills horizontal/upward velocity so parkour dodges cannot relocate the body.
+     * During the critical crawl window, allows slow horizontal movement only.
      */
-    private static void restrictUnconsciousMovement(Player player) {
+    private static void restrictUnconsciousMovement(Player player, PlayerDamageModel playerDamageModel) {
         player.setSprinting(false);
         player.setJumping(false);
         Vec3 motion = player.getDeltaMovement();
         double y = Math.min(0.0D, motion.y);
+        if (playerDamageModel.canCrawlWhileDowned()) {
+            double maxHorizontal = 0.10D * playerDamageModel.getCrawlSpeedFactor() / 0.28D;
+            maxHorizontal = Math.max(0.06D, Math.min(0.12D, maxHorizontal));
+            double horizontal = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+            double nx = motion.x;
+            double nz = motion.z;
+            if (horizontal > maxHorizontal && horizontal > 0.0D) {
+                double scale = maxHorizontal / horizontal;
+                nx *= scale;
+                nz *= scale;
+            }
+            if (nx != motion.x || nz != motion.z || motion.y > 0.0D) {
+                player.setDeltaMovement(nx, y, nz);
+            }
+            player.yya = 0.0F;
+            player.hasImpulse = true;
+            player.hurtMarked = true;
+            return;
+        }
         if (motion.x != 0.0D || motion.z != 0.0D || motion.y > 0.0D) {
             player.setDeltaMovement(0.0D, y, 0.0D);
         }
@@ -659,6 +711,7 @@ public class EventHandler {
         player.displayClientMessage(buildCommandTipLine(
                 "firstaid.tip.commands.group.advanced",
                 buildCommandTipChip("firstaid.tip.commands.randomdamage.label", "firstaid.tip.commands.randomdamage.detail", "/firstaid randomdamage friendly chance 80", ChatFormatting.GOLD),
+                buildCommandTipChip("firstaid.tip.commands.addiction.label", "firstaid.tip.commands.addiction.detail", "/firstaid addiction set @s 0", ChatFormatting.LIGHT_PURPLE),
                 buildCommandTipChip("firstaid.tip.commands.damagepart.label", "firstaid.tip.commands.damagepart.detail", "/damagePart HEAD 4", ChatFormatting.RED)
         ), false);
     }

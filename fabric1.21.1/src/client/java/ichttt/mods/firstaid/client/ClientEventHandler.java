@@ -46,6 +46,7 @@ public final class ClientEventHandler {
    private static final int RESCUE_SOUND_DELAY_TICKS = 10;
    private static final int SYNC_RETRY_TICKS = 20;
    private static final SuppressionFeedbackController SUPPRESSION_FEEDBACK_CONTROLLER = new SuppressionFeedbackController();
+   private static final PainVisualEffectsController PAIN_VISUAL_EFFECTS_CONTROLLER = new PainVisualEffectsController();
    private static final ProjectileNearMissDetector PROJECTILE_NEAR_MISS_DETECTOR = new ProjectileNearMissDetector(SUPPRESSION_FEEDBACK_CONTROLLER);
    private static final HeartbeatSoundController HEARTBEAT_SOUND_CONTROLLER = new HeartbeatSoundController();
    private static int id;
@@ -77,7 +78,7 @@ public final class ClientEventHandler {
          return;
       }
       if (isUnconscious(mc.player)) {
-         clearUnconsciousClientInput(mc.player);
+         clearUnconsciousClientInput(mc.player, canCrawlWhileDowned(mc.player));
       }
    }
 
@@ -89,7 +90,7 @@ public final class ClientEventHandler {
          ItemMedicine.clearAllClientReuseBlocks();
       } else if (!mc.isPaused()) {
          if (isUnconscious(mc.player)) {
-            clearUnconsciousClientInput(mc.player);
+            clearUnconsciousClientInput(mc.player, canCrawlWhileDowned(mc.player));
          }
          if (!mc.options.keyUse.isDown()) {
             requireUseReleaseBeforeHealingSelection = false;
@@ -104,6 +105,7 @@ public final class ClientEventHandler {
 
          retryDamageModelSync(mc);
          SUPPRESSION_FEEDBACK_CONTROLLER.tick(mc);
+         PAIN_VISUAL_EFFECTS_CONTROLLER.tick(mc);
          HEARTBEAT_SOUND_CONTROLLER.tick(mc);
          HealingSoundController.tick(mc);
          PROJECTILE_NEAR_MISS_DETECTOR.tick(mc);
@@ -202,6 +204,7 @@ public final class ClientEventHandler {
       HealingSoundController.clear();
       HEARTBEAT_SOUND_CONTROLLER.clear();
       SUPPRESSION_FEEDBACK_CONTROLLER.clear();
+      PAIN_VISUAL_EFFECTS_CONTROLLER.clear(Minecraft.getInstance());
       PROJECTILE_NEAR_MISS_DETECTOR.clear();
    }
 
@@ -235,27 +238,49 @@ public final class ClientEventHandler {
          : damageModel != null && damageModel.getUnconsciousTicks() > 0;
    }
 
-   private static void clearUnconsciousClientInput(net.minecraft.client.player.LocalPlayer player) {
+   public static boolean canCrawlWhileDowned(Player player) {
+      AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(player);
+      return damageModel instanceof PlayerDamageModel playerDamageModel && playerDamageModel.canCrawlWhileDowned();
+   }
+
+   private static void clearUnconsciousClientInput(net.minecraft.client.player.LocalPlayer player, boolean allowCrawl) {
       net.minecraft.client.player.Input input = player.input;
+      // Attribute already slows the player; keep a moderate input scale so limbSwing still advances.
+      float crawlFactor = 0.55F;
+      if (allowCrawl) {
+         AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(player);
+         if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+            crawlFactor = Math.max(0.35F, Math.min(0.70F, playerDamageModel.getCrawlSpeedFactor() * 2.0F));
+         }
+      }
       if (input != null) {
-         input.leftImpulse = 0.0F;
-         input.forwardImpulse = 0.0F;
-         input.up = false;
-         input.down = false;
-         input.left = false;
-         input.right = false;
-         input.jumping = false;
-         input.shiftKeyDown = false;
+         if (allowCrawl) {
+            input.leftImpulse *= crawlFactor;
+            input.forwardImpulse *= crawlFactor;
+            input.jumping = false;
+            input.shiftKeyDown = false;
+         } else {
+            input.leftImpulse = 0.0F;
+            input.forwardImpulse = 0.0F;
+            input.up = false;
+            input.down = false;
+            input.left = false;
+            input.right = false;
+            input.jumping = false;
+            input.shiftKeyDown = false;
+         }
       }
       player.setSprinting(false);
       player.setJumping(false);
 
       Minecraft mc = Minecraft.getInstance();
       if (mc.options != null) {
-         mc.options.keyUp.setDown(false);
-         mc.options.keyDown.setDown(false);
-         mc.options.keyLeft.setDown(false);
-         mc.options.keyRight.setDown(false);
+         if (!allowCrawl) {
+            mc.options.keyUp.setDown(false);
+            mc.options.keyDown.setDown(false);
+            mc.options.keyLeft.setDown(false);
+            mc.options.keyRight.setDown(false);
+         }
          mc.options.keyJump.setDown(false);
          mc.options.keySprint.setDown(false);
          for (net.minecraft.client.KeyMapping keyMapping : mc.options.keyMappings) {
@@ -270,12 +295,24 @@ public final class ClientEventHandler {
 
       net.minecraft.world.phys.Vec3 motion = player.getDeltaMovement();
       double y = Math.min(0.0D, motion.y);
-      if (motion.x != 0.0D || motion.z != 0.0D || motion.y > 0.0D) {
-         player.setDeltaMovement(0.0D, y, 0.0D);
+      if (allowCrawl) {
+         double maxHorizontal = 0.10D;
+         double horizontal = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+         if (horizontal > maxHorizontal && horizontal > 0.0D) {
+            double scale = maxHorizontal / horizontal;
+            player.setDeltaMovement(motion.x * scale, y, motion.z * scale);
+         } else if (motion.y > 0.0D) {
+            player.setDeltaMovement(motion.x, y, motion.z);
+         }
+         player.yya = 0.0F;
+      } else {
+         if (motion.x != 0.0D || motion.z != 0.0D || motion.y > 0.0D) {
+            player.setDeltaMovement(0.0D, y, 0.0D);
+         }
+         player.xxa = 0.0F;
+         player.zza = 0.0F;
+         player.yya = 0.0F;
       }
-      player.xxa = 0.0F;
-      player.zza = 0.0F;
-      player.yya = 0.0F;
    }
 
    public static float getGiveUpHoldProgress(float partialTick) {
@@ -459,6 +496,10 @@ public final class ClientEventHandler {
 
    public static float getInteractionHoldDurationSeconds() {
       return getCurrentInteractionHoldDurationTicks() / 20.0F;
+   }
+
+   public static PainVisualEffectsController getPainVisualEffectsController() {
+      return PAIN_VISUAL_EFFECTS_CONTROLLER;
    }
 
    public static SuppressionFeedbackController getSuppressionFeedbackController() {

@@ -2,17 +2,20 @@ package ichttt.mods.firstaid.common;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import ichttt.mods.firstaid.FirstAid;
 import ichttt.mods.firstaid.FirstAidConfig;
+import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
 import ichttt.mods.firstaid.common.damagesystem.PlayerDamageModel;
 import ichttt.mods.firstaid.common.network.FirstAidNetworking;
 import ichttt.mods.firstaid.common.util.CommonUtils;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -38,6 +41,16 @@ public final class FirstAidCommand {
                            Commands.literal("vignette")
                               .then(Commands.literal("on").executes(context -> setPainVignette(context.getSource(), true)))
                               .then(Commands.literal("off").executes(context -> setPainVignette(context.getSource(), false)))
+                        )
+                        .then(
+                           Commands.literal("hitpulse")
+                              .then(Commands.literal("on").executes(context -> setPainVignette(context.getSource(), true)))
+                              .then(Commands.literal("off").executes(context -> setPainVignette(context.getSource(), false)))
+                        )
+                        .then(
+                           Commands.literal("blur")
+                              .then(Commands.literal("on").executes(context -> setPainBlur(context.getSource(), true)))
+                              .then(Commands.literal("off").executes(context -> setPainBlur(context.getSource(), false)))
                         )
                         .then(
                            Commands.literal("fov")
@@ -156,6 +169,70 @@ public final class FirstAidCommand {
                   .then(Commands.literal("off").executes(context -> setCommandTips(context.getSource(), false)))
             )
       );
+      dispatcher.register(
+         Commands.literal("firstaid")
+            .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+            .then(
+               Commands.literal("addiction")
+                  .then(
+                     Commands.argument("player", EntityArgument.player())
+                        .executes(context -> queryAddiction(context.getSource(), EntityArgument.getPlayer(context, "player")))
+                  )
+                  .then(
+                     Commands.literal("set")
+                        .then(
+                           Commands.argument("player", EntityArgument.player())
+                              .then(
+                                 Commands.argument("value", FloatArgumentType.floatArg(0.0F, 100.0F))
+                                    .executes(
+                                       context -> setAddiction(
+                                          context.getSource(),
+                                          EntityArgument.getPlayer(context, "player"),
+                                          FloatArgumentType.getFloat(context, "value")
+                                       )
+                                    )
+                              )
+                        )
+                  )
+            )
+      );
+   }
+
+   private static int queryAddiction(CommandSourceStack source, ServerPlayer target) {
+      AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(target);
+      if (!(damageModel instanceof PlayerDamageModel playerDamageModel)) {
+         source.sendFailure(Component.translatable("firstaid.command.addiction.unavailable"));
+         return 0;
+      }
+      float value = playerDamageModel.getAddictionValue();
+      source.sendSuccess(
+         () -> Component.translatable(
+            "firstaid.command.addiction.query",
+            target.getDisplayName(),
+            String.format(java.util.Locale.ROOT, "%.1f", value)
+         ),
+         false
+      );
+      return 1;
+   }
+
+   private static int setAddiction(CommandSourceStack source, ServerPlayer target, float value) {
+      AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(target);
+      if (!(damageModel instanceof PlayerDamageModel playerDamageModel)) {
+         source.sendFailure(Component.translatable("firstaid.command.addiction.unavailable"));
+         return 0;
+      }
+      playerDamageModel.setAddictionValue(value);
+      FirstAidNetworking.sendDamageModelSync(target, playerDamageModel, FirstAidConfig.SERVER.scaleMaxHealth.get());
+      source.sendSuccess(
+         () -> Component.translatable(
+            "firstaid.command.addiction.set",
+            target.getDisplayName(),
+            String.format(java.util.Locale.ROOT, "%.1f", playerDamageModel.getAddictionValue())
+         ),
+         true
+      );
+      return 1;
    }
 
    private static int setCommandTips(CommandSourceStack source, boolean enabled) {
@@ -193,6 +270,14 @@ public final class FirstAidCommand {
       FirstAidConfig.persistCommandSettings();
       syncServerConfig(source);
       source.sendSuccess(() -> Component.translatable(enabled ? "firstaid.command.pain.display.vignette.on" : "firstaid.command.pain.display.vignette.off"), true);
+      return 1;
+   }
+
+   private static int setPainBlur(CommandSourceStack source, boolean enabled) {
+      FirstAid.enablePainBlur = enabled;
+      FirstAidConfig.persistCommandSettings();
+      syncServerConfig(source);
+      source.sendSuccess(() -> Component.translatable(enabled ? "firstaid.command.pain.display.blur.on" : "firstaid.command.pain.display.blur.off"), true);
       return 1;
    }
 

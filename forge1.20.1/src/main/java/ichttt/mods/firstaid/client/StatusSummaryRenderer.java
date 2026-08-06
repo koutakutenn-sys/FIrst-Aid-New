@@ -51,12 +51,36 @@ public final class StatusSummaryRenderer {
             painLevel = calculateLocalPainLevel(damageModel);
         }
         if (painLevel > 0) {
-            boolean painSuppressed = player.hasEffect(RegistryObjects.MORPHINE_EFFECT.get()) || player.hasEffect(RegistryObjects.PAINKILLER_EFFECT.get());
+            boolean painSuppressed = player.hasEffect(RegistryObjects.PAINKILLER_EFFECT.get())
+                    || player.hasEffect(RegistryObjects.MORPHINE_EFFECT.get());
             Component painText = painSuppressed
                     ? Component.translatable("firstaid.gui.status.pain_suppressed")
                     : Component.translatable("firstaid.gui.status.pain", Component.translatable(getPainSeverityKey(painLevel)));
             guiGraphics.drawString(font, painText, baseX, lineY, painSuppressed ? 0x8FD3FF : 0xFF8A8A);
             lineY += 10;
+        }
+
+        if (playerDamageModel != null) {
+            int pulse = playerDamageModel.getAddictionPulseType();
+            if (pulse == PlayerDamageModel.PULSE_INCREASE) {
+                guiGraphics.drawString(font, Component.translatable("firstaid.gui.status.addiction_increase"), baseX, lineY, 0xE8A0A0);
+                lineY += 10;
+            } else if (pulse == PlayerDamageModel.PULSE_ULTRA_INCREASE) {
+                guiGraphics.drawString(font, Component.translatable("firstaid.gui.status.addiction_ultra_increase"), baseX, lineY, 0xFF6A6A);
+                lineY += 10;
+            } else if (pulse == PlayerDamageModel.PULSE_DECREASE) {
+                guiGraphics.drawString(font, Component.translatable("firstaid.gui.status.addiction_decrease"), baseX, lineY, 0x90C090);
+                lineY += 10;
+            }
+            if (playerDamageModel.getWithdrawalEpisodeTicksLeft() > 0) {
+                String episodeKey = switch (playerDamageModel.getWithdrawalEpisodeType()) {
+                    case PlayerDamageModel.EPISODE_DARKNESS -> "firstaid.gui.status.withdrawal_darkness";
+                    case PlayerDamageModel.EPISODE_NAUSEA -> "firstaid.gui.status.withdrawal_nausea";
+                    default -> "firstaid.gui.status.withdrawal_pain";
+                };
+                guiGraphics.drawString(font, Component.translatable(episodeKey), baseX, lineY, 0xC8A2C8);
+                lineY += 10;
+            }
         }
 
         if (player.hasEffect(RegistryObjects.PAINKILLER_EFFECT.get())) {
@@ -90,10 +114,18 @@ public final class StatusSummaryRenderer {
         if (painLevel > 0) {
             count++;
         }
-        if (player.hasEffect(RegistryObjects.PAINKILLER_EFFECT.get())) {
-            count++;
+        if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+            if (playerDamageModel.getAddictionPulseType() != PlayerDamageModel.PULSE_NONE) {
+                count++;
+            }
+            if (playerDamageModel.getWithdrawalEpisodeTicksLeft() > 0) {
+                count++;
+            }
+            if (playerDamageModel.getAdrenalineLevel() > 0) {
+                count++;
+            }
         }
-        if (damageModel instanceof PlayerDamageModel playerDamageModel && playerDamageModel.getAdrenalineLevel() > 0) {
+        if (player.hasEffect(RegistryObjects.PAINKILLER_EFFECT.get())) {
             count++;
         }
         for (MedicineStatusDisplay display : MedicineStatusClientHelper.collect(player)) {

@@ -1,3 +1,34 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  javax.annotation.Nonnull
+ *  javax.annotation.Nullable
+ *  net.minecraft.core.Holder
+ *  net.minecraft.nbt.CompoundTag
+ *  net.minecraft.nbt.Tag
+ *  net.minecraft.resources.Identifier
+ *  net.minecraft.server.level.ServerPlayer
+ *  net.minecraft.util.Mth
+ *  net.minecraft.world.damagesource.DamageSource
+ *  net.minecraft.world.effect.MobEffect
+ *  net.minecraft.world.effect.MobEffectInstance
+ *  net.minecraft.world.effect.MobEffects
+ *  net.minecraft.world.entity.Entity
+ *  net.minecraft.world.entity.EntityDimensions
+ *  net.minecraft.world.entity.LivingEntity
+ *  net.minecraft.world.entity.Pose
+ *  net.minecraft.world.entity.ai.attributes.Attribute
+ *  net.minecraft.world.entity.ai.attributes.AttributeInstance
+ *  net.minecraft.world.entity.ai.attributes.AttributeMap
+ *  net.minecraft.world.entity.ai.attributes.AttributeModifier
+ *  net.minecraft.world.entity.ai.attributes.AttributeModifier$Operation
+ *  net.minecraft.world.entity.ai.attributes.Attributes
+ *  net.minecraft.world.entity.player.Player
+ *  net.minecraft.world.level.Level
+ *  net.minecraft.world.phys.AABB
+ *  net.minecraft.world.phys.Vec3
+ */
 package ichttt.mods.firstaid.common.damagesystem;
 
 import ichttt.mods.firstaid.FirstAid;
@@ -13,8 +44,10 @@ import ichttt.mods.firstaid.common.ClientAccess;
 import ichttt.mods.firstaid.common.EventHandler;
 import ichttt.mods.firstaid.common.RegistryObjects;
 import ichttt.mods.firstaid.common.compat.playerrevive.PRCompatManager;
+import ichttt.mods.firstaid.common.damagesystem.DamageablePart;
 import ichttt.mods.firstaid.common.damagesystem.debuff.SharedDebuff;
 import ichttt.mods.firstaid.common.network.FirstAidNetworking;
+import ichttt.mods.firstaid.common.potion.MilkImmuneMobEffectInstance;
 import ichttt.mods.firstaid.common.registries.FirstAidRegistryLookups;
 import ichttt.mods.firstaid.common.registries.LookupReloadListener;
 import ichttt.mods.firstaid.common.util.CommonUtils;
@@ -23,7 +56,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
@@ -39,1374 +71,1823 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeMap;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-public class PlayerDamageModel extends AbstractPlayerDamageModel implements LookupReloadListener {
-   private static final DecimalFormat TEXT_FORMAT = new DecimalFormat("0.0");
-   private static final int MAX_PAIN_LEVEL = 5;
-   private static final int MAX_ADRENALINE_LEVEL = 3;
-   private static final int MAX_ADRENALINE_TICKS = 200;
-   private static final float MAX_SUPPRESSION_INTENSITY = 1.0F;
-   private static final float ADRENALINE_ABSORPTION_AMOUNT = 8.0F;
-   private static final int ADRENALINE_ABSORPTION_AMPLIFIER = 1;
-   private static final int ADRENALINE_HASTE_AMPLIFIER = 0;
-   private static final int ADRENALINE_STRENGTH_AMPLIFIER = 0;
-   private static final int ADRENALINE_SPEED_AMPLIFIER = 0;
-   private static final float ADRENALINE_INJECTION_SUPPRESSION_STRENGTH = 0.35F;
-   private static final float SUPPRESSION_GAIN_MULTIPLIER = 0.48F;
-   private static final int SUPPRESSION_HOLD_TICKS = 80;
-   private static final float SUPPRESSION_DECAY_STEP = 0.03F;
-   private static final int SUPPRESSION_DECAY_INTERVAL = 4;
-   private static final int ADRENALINE_DURATION_TICKS = 700;
-   private static final int PAINKILLER_ACTIVATION_DELAY_TICKS = 600;
-   private static final int MORPHINE_ACTIVATION_DELAY_TICKS = 200;
-   private static final int CRITICAL_UNCONSCIOUS_TICKS = 3000;
-   private static final int RESCUE_DURATION_TICKS = 160;
-   private static final int DEFIBRILLATOR_RESCUE_DURATION_TICKS = 60;
-   private static final int EXECUTION_DURATION_TICKS = 100;
-   private static final float CRITICAL_DOWNED_CRITICAL_PART_DAMAGE_MULTIPLIER = 0.1F;
-   private static final double RESCUE_RANGE = 3.0;
-   private static final int COLLAPSE_ANIMATION_TICKS = 12;
-   private static final int COLLAPSE_SEARCH_RADIUS = 2;
-   private static final double COLLAPSE_SUPPORT_PROBE_DEPTH = 0.125;
-   private static final EntityDimensions UNCONSCIOUS_DIMENSIONS = EntityDimensions.scalable(1.4F, 1.0F);
-   private static final EntityDimensions CRAMPED_UNCONSCIOUS_DIMENSIONS = EntityDimensions.scalable(0.6F, 1.0F);
-   private static final Identifier ATTR_UNCONSCIOUS = Identifier.fromNamespaceAndPath("firstaid", "unconscious");
-   private static final String UNCONSCIOUS_REASON_NONE = "";
-   private static final String UNCONSCIOUS_REASON_CRITICAL = "firstaid.gui.critical_condition";
-   private static final String UNCONSCIOUS_REASON_RECOVERING = "firstaid.gui.stabilizing";
-   private final Set<SharedDebuff> sharedDebuffs = new HashSet<>();
-   private int morphineTicksLeft = 0;
-   private int pendingPainkillerTicks = 0;
-   private int pendingMorphineDelayTicks = 0;
-   private int pendingMorphineEffectTicks = 0;
-   private int sleepBlockTicks = 0;
-   private float prevHealthCurrent = -1.0F;
-   private float prevScaleFactor;
-   private final boolean noCritical;
-   private boolean needsMorphineUpdate = false;
-   private int resyncTimer = -1;
-   private int painLevel = 0;
-   private int adrenalineLevel = 0;
-   private int adrenalineTicks = 0;
-   private int adrenalineHeartbeatTriggerId = 0;
-   private float suppressionIntensity = 0.0F;
-   private int suppressionHoldTicks = 0;
-   private int suppressionDecayTicker = 0;
-   private int unconsciousTicks = 0;
-   private boolean criticalConditionActive = false;
-   private boolean unconsciousAllowsGiveUp = false;
-   private boolean unconsciousCausesDeath = false;
-   private String unconsciousReasonKey = "";
-   private int collapseAnimationTicks = 0;
-   private boolean collapsePlacementPending = false;
-   private boolean externalRevivePending = false;
+public class PlayerDamageModel
+extends AbstractPlayerDamageModel
+implements LookupReloadListener {
+    private static final DecimalFormat TEXT_FORMAT = new DecimalFormat("0.0");
+    private static final int MAX_PAIN_LEVEL = 5;
+    private static final int MAX_ADRENALINE_LEVEL = 3;
+    private static final int MAX_ADRENALINE_TICKS = 200;
+    private static final float MAX_SUPPRESSION_INTENSITY = 1.0f;
+    private static final float ADRENALINE_ABSORPTION_AMOUNT = 8.0f;
+    private static final int ADRENALINE_ABSORPTION_AMPLIFIER = 1;
+    private static final int ADRENALINE_HASTE_AMPLIFIER = 0;
+    private static final int ADRENALINE_STRENGTH_AMPLIFIER = 0;
+    private static final int ADRENALINE_SPEED_AMPLIFIER = 0;
+    private static final float ADRENALINE_INJECTION_SUPPRESSION_STRENGTH = 0.35f;
+    private static final float SUPPRESSION_GAIN_MULTIPLIER = 0.48f;
+    private static final int SUPPRESSION_HOLD_TICKS = 80;
+    private static final float SUPPRESSION_DECAY_STEP = 0.03f;
+    private static final int SUPPRESSION_DECAY_INTERVAL = 4;
+    private static final int ADRENALINE_DURATION_TICKS = 700;
+    private static final int PAINKILLER_ACTIVATION_DELAY_TICKS = 600;
+    private static final int MORPHINE_ACTIVATION_DELAY_TICKS = 200;
+    private static final int CRITICAL_UNCONSCIOUS_TICKS = 3000;
+    private static final int RESCUE_DURATION_TICKS = 160;
+    private static final int DEFIBRILLATOR_RESCUE_DURATION_TICKS = 60;
+    private static final int EXECUTION_DURATION_TICKS = 100;
+    private static final float CRITICAL_DOWNED_CRITICAL_PART_DAMAGE_MULTIPLIER = 0.1f;
+    private static final double RESCUE_RANGE = 3.0;
+    private static final int COLLAPSE_ANIMATION_TICKS = 12;
+    private static final int COLLAPSE_SEARCH_RADIUS = 2;
+    private static final double COLLAPSE_SUPPORT_PROBE_DEPTH = 0.125;
+    private static final EntityDimensions UNCONSCIOUS_DIMENSIONS = EntityDimensions.scalable((float)1.4f, (float)1.0f);
+    private static final EntityDimensions CRAMPED_UNCONSCIOUS_DIMENSIONS = EntityDimensions.scalable((float)0.6f, (float)1.0f);
+    private static final Identifier ATTR_UNCONSCIOUS = Identifier.fromNamespaceAndPath((String)"firstaid", (String)"unconscious");
+    private static final String UNCONSCIOUS_REASON_NONE = "";
+    private static final String UNCONSCIOUS_REASON_CRITICAL = "firstaid.gui.critical_condition";
+    private static final String UNCONSCIOUS_REASON_RECOVERING = "firstaid.gui.stabilizing";
+    public static final float MORPHINE_INJECTOR_DURATION_MULTIPLIER = 2.5f;
+    public static final int MORPHINE_ORAL_REGEN_TICKS = 500;
+    public static final int MORPHINE_INJECTOR_REGEN_TICKS = 3600;
+    /** Peak suppression after morphine injector: hold max briefly, then allow normal decay. */
+    private static final int FORCE_MAX_SUPPRESSION_HOLD_TICKS = 20 * 15;
+    private static final float CRAWL_WINDOW_FRACTION = 0.6f;
+    private static final float CRAWL_SPEED_FACTOR = 0.28f;
+    private static final float CRAWL_MOVE_ATTRIBUTE = -0.72f;
+    private static final float ADDICTION_MAX = 100.0f;
+    private static final float ADDICTION_ORAL_GAIN = 6.0f;
+    private static final float ADDICTION_INJECTION_GAIN = 16.0f;
+    private static final float ADDICTION_MEDICAL_MULT = 0.55f;
+    private static final float ADDICTION_RECREATIONAL_MULT = 1.35f;
+    private static final float ADDICTION_MILD_THRESHOLD = 0.25f;
+    private static final float ADDICTION_MEDIUM_THRESHOLD = 0.5f;
+    private static final float ADDICTION_SEVERE_THRESHOLD = 0.75f;
+    private static final int ADDICTION_DECAY_DELAY_TICKS = 2400;
+    private static final float ADDICTION_DECAY_PER_SECOND = 0.06f;
+    private static final float ADDICTION_DECAY_PER_SECOND_LOW = 0.015f;
+    private static final float ADDICTION_LOW_DECAY_THRESHOLD = 30.0f;
+    private static final int ADDICTION_EPISODE_CHECK_INTERVAL_MILD = 280;
+    private static final int ADDICTION_EPISODE_CHECK_INTERVAL_SEVERE = 60;
+    private static final int ADDICTION_EPISODE_COOLDOWN_MILD = 440;
+    private static final int ADDICTION_EPISODE_COOLDOWN_SEVERE = 160;
+    private static final float ADDICTION_EPISODE_BASE_CHANCE = 0.05f;
+    private static final float ADDICTION_EPISODE_CHANCE_SCALE = 0.8f;
+    private static final float ADDICTION_EPISODE_MAX_CHANCE = 0.88f;
+    private static final int ADDICTION_PULSE_INCREASE_TICKS = 300;
+    private static final int ADDICTION_PULSE_DECREASE_TICKS = 160;
+    private static final int ADDICTION_EPISODE_DURATION_MILD_SECONDS = 28;
+    private static final int ADDICTION_EPISODE_DURATION_SEVERE_SECONDS = 110;
+    public static final int EPISODE_NONE = 0;
+    public static final int EPISODE_PAIN = 1;
+    public static final int EPISODE_UNEXPLAINED_PAIN = 1;
+    public static final int EPISODE_DARKNESS = 2;
+    public static final int EPISODE_NAUSEA = 4;
+    public static final int EPISODE_WEAKNESS = 8;
+    public static final int EPISODE_SLOWNESS = 16;
+    public static final int PULSE_NONE = 0;
+    public static final int PULSE_INCREASE = 1;
+    public static final int PULSE_ULTRA_INCREASE = 2;
+    public static final int PULSE_DECREASE = 3;
+    private final Set<SharedDebuff> sharedDebuffs = new HashSet<SharedDebuff>();
+    private int morphineTicksLeft = 0;
+    private int morphineMaxTicks = 0;
+    private int pendingPainkillerTicks = 0;
+    private int pendingMorphineDelayTicks = 0;
+    private int pendingMorphineEffectTicks = 0;
+    private boolean pendingMorphineMedicalUse = false;
+    private int sleepBlockTicks = 0;
+    private float prevHealthCurrent = -1.0f;
+    private float prevScaleFactor;
+    private final boolean noCritical;
+    private boolean needsMorphineUpdate = false;
+    private int resyncTimer = -1;
+    private int painLevel = 0;
+    private int adrenalineLevel = 0;
+    private int adrenalineTicks = 0;
+    private int adrenalineHeartbeatTriggerId = 0;
+    private float suppressionIntensity = 0.0f;
+    private int suppressionHoldTicks = 0;
+    private int suppressionDecayTicker = 0;
+    private int unconsciousTicks = 0;
+    private int unconsciousMaxTicks = 0;
+    private boolean criticalConditionActive = false;
+    private boolean unconsciousAllowsGiveUp = false;
+    private boolean unconsciousCausesDeath = false;
+    private String unconsciousReasonKey = "";
+    private int collapseAnimationTicks = 0;
+    private boolean collapsePlacementPending = false;
+    private boolean externalRevivePending = false;
+    private float addictionValue = 0.0f;
+    private int ticksSinceLastOpioid = 0;
+    private int withdrawalEpisodeType = 0;
+    private int withdrawalEpisodeTicksLeft = 0;
+    private int withdrawalCooldownTicks = 0;
+    private int withdrawalCheckTicks = 0;
+    private int addictionPulseType = 0;
+    private int addictionPulseTicks = 0;
 
-   public PlayerDamageModel() {
-      super(
-         new DamageablePart(FirstAidConfig.SERVER.maxHealthHead.get(), FirstAidConfig.SERVER.causeDeathHead.get(), EnumPlayerPart.HEAD),
-         new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftArm.get(), false, EnumPlayerPart.LEFT_ARM),
-         new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftLeg.get(), false, EnumPlayerPart.LEFT_LEG),
-         new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftFoot.get(), false, EnumPlayerPart.LEFT_FOOT),
-         new DamageablePart(FirstAidConfig.SERVER.maxHealthBody.get(), FirstAidConfig.SERVER.causeDeathBody.get(), EnumPlayerPart.BODY),
-         new DamageablePart(FirstAidConfig.SERVER.maxHealthRightArm.get(), false, EnumPlayerPart.RIGHT_ARM),
-         new DamageablePart(FirstAidConfig.SERVER.maxHealthRightLeg.get(), false, EnumPlayerPart.RIGHT_LEG),
-         new DamageablePart(FirstAidConfig.SERVER.maxHealthRightFoot.get(), false, EnumPlayerPart.RIGHT_FOOT)
-      );
-      this.noCritical = !FirstAidConfig.SERVER.causeDeathBody.get() && !FirstAidConfig.SERVER.causeDeathHead.get();
-      FirstAidRegistryLookups.registerReloadListener(this);
-   }
+    public PlayerDamageModel() {
+        super(new DamageablePart(FirstAidConfig.SERVER.maxHealthHead.get(), FirstAidConfig.SERVER.causeDeathHead.get(), EnumPlayerPart.HEAD), new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftArm.get(), false, EnumPlayerPart.LEFT_ARM), new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftLeg.get(), false, EnumPlayerPart.LEFT_LEG), new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftFoot.get(), false, EnumPlayerPart.LEFT_FOOT), new DamageablePart(FirstAidConfig.SERVER.maxHealthBody.get(), FirstAidConfig.SERVER.causeDeathBody.get(), EnumPlayerPart.BODY), new DamageablePart(FirstAidConfig.SERVER.maxHealthRightArm.get(), false, EnumPlayerPart.RIGHT_ARM), new DamageablePart(FirstAidConfig.SERVER.maxHealthRightLeg.get(), false, EnumPlayerPart.RIGHT_LEG), new DamageablePart(FirstAidConfig.SERVER.maxHealthRightFoot.get(), false, EnumPlayerPart.RIGHT_FOOT));
+        this.noCritical = FirstAidConfig.SERVER.causeDeathBody.get() == false && FirstAidConfig.SERVER.causeDeathHead.get() == false;
+        FirstAidRegistryLookups.registerReloadListener(this);
+    }
 
-   public CompoundTag serializeNBT() {
-      CompoundTag tagCompound = new CompoundTag();
-      tagCompound.put("head", (Tag)this.HEAD.serializeNBT());
-      tagCompound.put("leftArm", (Tag)this.LEFT_ARM.serializeNBT());
-      tagCompound.put("leftLeg", (Tag)this.LEFT_LEG.serializeNBT());
-      tagCompound.put("leftFoot", (Tag)this.LEFT_FOOT.serializeNBT());
-      tagCompound.put("body", (Tag)this.BODY.serializeNBT());
-      tagCompound.put("rightArm", (Tag)this.RIGHT_ARM.serializeNBT());
-      tagCompound.put("rightLeg", (Tag)this.RIGHT_LEG.serializeNBT());
-      tagCompound.put("rightFoot", (Tag)this.RIGHT_FOOT.serializeNBT());
-      tagCompound.putBoolean("hasTutorial", this.hasTutorial);
-      tagCompound.putInt("pendingPainkillerTicks", this.pendingPainkillerTicks);
-      tagCompound.putInt("pendingMorphineDelayTicks", this.pendingMorphineDelayTicks);
-      tagCompound.putInt("pendingMorphineEffectTicks", this.pendingMorphineEffectTicks);
-      tagCompound.putInt("painLevel", this.painLevel);
-      tagCompound.putInt("adrenalineLevel", this.adrenalineLevel);
-      tagCompound.putInt("adrenalineTicks", this.adrenalineTicks);
-      tagCompound.putInt("adrenalineHeartbeatTriggerId", this.adrenalineHeartbeatTriggerId);
-      tagCompound.putFloat("suppressionIntensity", this.suppressionIntensity);
-      tagCompound.putInt("suppressionHoldTicks", this.suppressionHoldTicks);
-      tagCompound.putInt("suppressionDecayTicker", this.suppressionDecayTicker);
-      tagCompound.putInt("unconsciousTicks", this.unconsciousTicks);
-      tagCompound.putBoolean("criticalConditionActive", this.criticalConditionActive);
-      tagCompound.putBoolean("unconsciousAllowsGiveUp", this.unconsciousAllowsGiveUp);
-      tagCompound.putBoolean("unconsciousCausesDeath", this.unconsciousCausesDeath);
-      tagCompound.putBoolean("externalRevivePending", this.externalRevivePending);
-      tagCompound.putInt("collapseAnimationTicks", this.collapseAnimationTicks);
-      if (!this.unconsciousReasonKey.isEmpty()) {
-         tagCompound.putString("unconsciousReasonKey", this.unconsciousReasonKey);
-      }
+    @Override
+    public CompoundTag serializeNBT() {
+        CompoundTag tagCompound = new CompoundTag();
+        tagCompound.put("head", (Tag)this.HEAD.serializeNBT());
+        tagCompound.put("leftArm", (Tag)this.LEFT_ARM.serializeNBT());
+        tagCompound.put("leftLeg", (Tag)this.LEFT_LEG.serializeNBT());
+        tagCompound.put("leftFoot", (Tag)this.LEFT_FOOT.serializeNBT());
+        tagCompound.put("body", (Tag)this.BODY.serializeNBT());
+        tagCompound.put("rightArm", (Tag)this.RIGHT_ARM.serializeNBT());
+        tagCompound.put("rightLeg", (Tag)this.RIGHT_LEG.serializeNBT());
+        tagCompound.put("rightFoot", (Tag)this.RIGHT_FOOT.serializeNBT());
+        tagCompound.putBoolean("hasTutorial", this.hasTutorial);
+        tagCompound.putInt("morphineTicks", this.morphineTicksLeft);
+        tagCompound.putInt("morphineMaxTicks", this.morphineMaxTicks);
+        tagCompound.putInt("pendingPainkillerTicks", this.pendingPainkillerTicks);
+        tagCompound.putInt("pendingMorphineDelayTicks", this.pendingMorphineDelayTicks);
+        tagCompound.putInt("pendingMorphineEffectTicks", this.pendingMorphineEffectTicks);
+        tagCompound.putBoolean("pendingMorphineMedicalUse", this.pendingMorphineMedicalUse);
+        tagCompound.putInt("painLevel", this.painLevel);
+        tagCompound.putInt("adrenalineLevel", this.adrenalineLevel);
+        tagCompound.putInt("adrenalineTicks", this.adrenalineTicks);
+        tagCompound.putInt("adrenalineHeartbeatTriggerId", this.adrenalineHeartbeatTriggerId);
+        tagCompound.putFloat("suppressionIntensity", this.suppressionIntensity);
+        tagCompound.putInt("suppressionHoldTicks", this.suppressionHoldTicks);
+        tagCompound.putInt("suppressionDecayTicker", this.suppressionDecayTicker);
+        tagCompound.putInt("unconsciousTicks", this.unconsciousTicks);
+        tagCompound.putInt("unconsciousMaxTicks", this.unconsciousMaxTicks);
+        tagCompound.putBoolean("criticalConditionActive", this.criticalConditionActive);
+        tagCompound.putBoolean("unconsciousAllowsGiveUp", this.unconsciousAllowsGiveUp);
+        tagCompound.putBoolean("unconsciousCausesDeath", this.unconsciousCausesDeath);
+        tagCompound.putBoolean("externalRevivePending", this.externalRevivePending);
+        tagCompound.putInt("collapseAnimationTicks", this.collapseAnimationTicks);
+        tagCompound.putFloat("addictionValue", this.addictionValue);
+        tagCompound.putInt("ticksSinceLastOpioid", this.ticksSinceLastOpioid);
+        tagCompound.putInt("withdrawalEpisodeType", this.withdrawalEpisodeType);
+        tagCompound.putInt("withdrawalEpisodeTicksLeft", this.withdrawalEpisodeTicksLeft);
+        tagCompound.putInt("withdrawalCooldownTicks", this.withdrawalCooldownTicks);
+        tagCompound.putInt("withdrawalCheckTicks", this.withdrawalCheckTicks);
+        tagCompound.putInt("addictionPulseType", this.addictionPulseType);
+        tagCompound.putInt("addictionPulseTicks", this.addictionPulseTicks);
+        if (!this.unconsciousReasonKey.isEmpty()) {
+            tagCompound.putString("unconsciousReasonKey", this.unconsciousReasonKey);
+        }
+        return tagCompound;
+    }
 
-      return tagCompound;
-   }
+    @Override
+    public void deserializeNBT(CompoundTag nbt) {
+        this.HEAD.deserializeNBT(nbt.getCompoundOrEmpty("head"));
+        this.LEFT_ARM.deserializeNBT(nbt.getCompoundOrEmpty("leftArm"));
+        this.LEFT_LEG.deserializeNBT(nbt.getCompoundOrEmpty("leftLeg"));
+        this.LEFT_FOOT.deserializeNBT(nbt.getCompoundOrEmpty("leftFoot"));
+        this.BODY.deserializeNBT(nbt.getCompoundOrEmpty("body"));
+        this.RIGHT_ARM.deserializeNBT(nbt.getCompoundOrEmpty("rightArm"));
+        this.RIGHT_LEG.deserializeNBT(nbt.getCompoundOrEmpty("rightLeg"));
+        this.RIGHT_FOOT.deserializeNBT(nbt.getCompoundOrEmpty("rightFoot"));
+        if (nbt.contains("morphineTicks")) {
+            this.morphineTicksLeft = nbt.getIntOr("morphineTicks", 0);
+        this.morphineMaxTicks = nbt.getIntOr("morphineMaxTicks", Math.max(this.morphineMaxTicks, this.morphineTicksLeft));
+            this.needsMorphineUpdate = true;
+        }
+        this.pendingPainkillerTicks = nbt.getIntOr("pendingPainkillerTicks", 0);
+        this.pendingMorphineDelayTicks = nbt.getIntOr("pendingMorphineDelayTicks", 0);
+        this.pendingMorphineEffectTicks = nbt.getIntOr("pendingMorphineEffectTicks", 0);
+        this.pendingMorphineMedicalUse = nbt.getBooleanOr("pendingMorphineMedicalUse", false);
+        if (nbt.contains("hasTutorial")) {
+            this.hasTutorial = nbt.getBooleanOr("hasTutorial", false);
+        }
+        this.painLevel = nbt.getIntOr("painLevel", 0);
+        this.adrenalineLevel = nbt.getIntOr("adrenalineLevel", 0);
+        this.adrenalineTicks = nbt.getIntOr("adrenalineTicks", 0);
+        this.adrenalineHeartbeatTriggerId = nbt.getIntOr("adrenalineHeartbeatTriggerId", 0);
+        this.suppressionIntensity = nbt.contains("suppressionIntensity") ? Mth.clamp((float)nbt.getFloatOr("suppressionIntensity", 0.0f), (float)0.0f, (float)1.0f) : Mth.clamp((float)((float)this.adrenalineTicks / 200.0f), (float)0.0f, (float)1.0f);
+        this.suppressionHoldTicks = Math.min(nbt.getIntOr("suppressionHoldTicks", 0), FORCE_MAX_SUPPRESSION_HOLD_TICKS);
+        this.suppressionDecayTicker = nbt.getIntOr("suppressionDecayTicker", 0);
+        this.unconsciousTicks = nbt.getIntOr("unconsciousTicks", 0);
+        this.unconsciousMaxTicks = nbt.contains("unconsciousMaxTicks") ? nbt.getIntOr("unconsciousMaxTicks", 0) : this.unconsciousTicks;
+        this.criticalConditionActive = nbt.getBooleanOr("criticalConditionActive", false);
+        this.unconsciousAllowsGiveUp = nbt.getBooleanOr("unconsciousAllowsGiveUp", this.criticalConditionActive);
+        this.unconsciousCausesDeath = nbt.getBooleanOr("unconsciousCausesDeath", this.criticalConditionActive);
+        this.externalRevivePending = nbt.getBooleanOr("externalRevivePending", false);
+        this.unconsciousReasonKey = nbt.getStringOr("unconsciousReasonKey", this.criticalConditionActive ? UNCONSCIOUS_REASON_CRITICAL : UNCONSCIOUS_REASON_NONE);
+        this.collapseAnimationTicks = nbt.getIntOr("collapseAnimationTicks", 0);
+        this.addictionValue = nbt.contains("addictionValue") ? Mth.clamp((float)nbt.getFloatOr("addictionValue", 0.0f), (float)0.0f, (float)100.0f) : 0.0f;
+        this.ticksSinceLastOpioid = nbt.getIntOr("ticksSinceLastOpioid", 0);
+        this.withdrawalEpisodeType = nbt.getIntOr("withdrawalEpisodeType", 0);
+        this.withdrawalEpisodeTicksLeft = nbt.getIntOr("withdrawalEpisodeTicksLeft", 0);
+        this.withdrawalCooldownTicks = nbt.getIntOr("withdrawalCooldownTicks", 0);
+        this.withdrawalCheckTicks = nbt.getIntOr("withdrawalCheckTicks", 0);
+        if (this.withdrawalEpisodeType == 2) {
+            this.withdrawalEpisodeType = 3;
+        } else if (this.withdrawalEpisodeType == 3) {
+            this.withdrawalEpisodeType = 5;
+        } else if (this.withdrawalEpisodeType == 1) {
+            this.withdrawalEpisodeType = 1;
+        }
+        this.addictionPulseType = nbt.getIntOr("addictionPulseType", 0);
+        this.addictionPulseTicks = nbt.getIntOr("addictionPulseTicks", 0);
+        this.collapsePlacementPending = false;
+        this.refreshSuppressionSnapshot();
+    }
 
-   public void deserializeNBT(CompoundTag nbt) {
-      this.HEAD.deserializeNBT(nbt.getCompoundOrEmpty("head"));
-      this.LEFT_ARM.deserializeNBT(nbt.getCompoundOrEmpty("leftArm"));
-      this.LEFT_LEG.deserializeNBT(nbt.getCompoundOrEmpty("leftLeg"));
-      this.LEFT_FOOT.deserializeNBT(nbt.getCompoundOrEmpty("leftFoot"));
-      this.BODY.deserializeNBT(nbt.getCompoundOrEmpty("body"));
-      this.RIGHT_ARM.deserializeNBT(nbt.getCompoundOrEmpty("rightArm"));
-      this.RIGHT_LEG.deserializeNBT(nbt.getCompoundOrEmpty("rightLeg"));
-      this.RIGHT_FOOT.deserializeNBT(nbt.getCompoundOrEmpty("rightFoot"));
-      if (nbt.contains("morphineTicks")) {
-         this.morphineTicksLeft = nbt.getIntOr("morphineTicks", 0);
-         this.needsMorphineUpdate = true;
-      }
-
-      this.pendingPainkillerTicks = nbt.getIntOr("pendingPainkillerTicks", 0);
-      this.pendingMorphineDelayTicks = nbt.getIntOr("pendingMorphineDelayTicks", 0);
-      this.pendingMorphineEffectTicks = nbt.getIntOr("pendingMorphineEffectTicks", 0);
-      if (nbt.contains("hasTutorial")) {
-         this.hasTutorial = nbt.getBooleanOr("hasTutorial", false);
-      }
-
-      this.painLevel = nbt.getIntOr("painLevel", 0);
-      this.adrenalineLevel = nbt.getIntOr("adrenalineLevel", 0);
-      this.adrenalineTicks = nbt.getIntOr("adrenalineTicks", 0);
-      this.adrenalineHeartbeatTriggerId = nbt.getIntOr("adrenalineHeartbeatTriggerId", 0);
-      this.suppressionIntensity = nbt.contains("suppressionIntensity")
-         ? Mth.clamp(nbt.getFloatOr("suppressionIntensity", 0.0F), 0.0F, 1.0F)
-         : Mth.clamp(this.adrenalineTicks / 200.0F, 0.0F, 1.0F);
-      this.suppressionHoldTicks = nbt.getIntOr("suppressionHoldTicks", 0);
-      this.suppressionDecayTicker = nbt.getIntOr("suppressionDecayTicker", 0);
-      this.unconsciousTicks = nbt.getIntOr("unconsciousTicks", 0);
-      this.criticalConditionActive = nbt.getBooleanOr("criticalConditionActive", false);
-      this.unconsciousAllowsGiveUp = nbt.getBooleanOr("unconsciousAllowsGiveUp", this.criticalConditionActive);
-      this.unconsciousCausesDeath = nbt.getBooleanOr("unconsciousCausesDeath", this.criticalConditionActive);
-      this.externalRevivePending = nbt.getBooleanOr("externalRevivePending", false);
-      this.unconsciousReasonKey = nbt.getStringOr("unconsciousReasonKey", this.criticalConditionActive ? "firstaid.gui.critical_condition" : "");
-      this.collapseAnimationTicks = nbt.getIntOr("collapseAnimationTicks", 0);
-      this.collapsePlacementPending = false;
-      this.refreshSuppressionSnapshot();
-   }
-
-   @Override
-   public void onLookupsReloaded() {
-      FirstAid.LOGGER.debug("Reloaded lookups");
-      this.sharedDebuffs.clear();
-
-      for (EnumDebuffSlot debuffSlot : EnumDebuffSlot.values()) {
-         IDebuff[] debuffs = FirstAidRegistryLookups.getDebuffs(debuffSlot);
-
-         for (EnumPlayerPart playerPart : debuffSlot.playerParts) {
-            this.getFromEnum(playerPart).loadDebuffInfo(debuffs);
-         }
-
-         for (IDebuff debuff : debuffs) {
-            if (debuff instanceof SharedDebuff sharedDebuff) {
-               this.sharedDebuffs.add(sharedDebuff);
+    @Override
+    public void onLookupsReloaded() {
+        FirstAid.LOGGER.debug("Reloaded lookups");
+        this.sharedDebuffs.clear();
+        for (EnumDebuffSlot debuffSlot : EnumDebuffSlot.values()) {
+            IDebuff[] debuffs = FirstAidRegistryLookups.getDebuffs(debuffSlot);
+            for (EnumPlayerPart enumPlayerPart : debuffSlot.playerParts) {
+                this.getFromEnum(enumPlayerPart).loadDebuffInfo(debuffs);
             }
-         }
-      }
-   }
-
-   @Override
-   public void tick(Level world, Player player) {
-      if (!this.isDead(player)) {
-         if (this.sleepBlockTicks > 0) {
-            this.sleepBlockTicks--;
-         } else if (this.sleepBlockTicks < 0) {
-            throw new RuntimeException("Negative sleepBlockTicks " + this.sleepBlockTicks);
-         }
-
-         float newCurrentHealth = this.calculateNewCurrentHealth(player);
-         if (Float.isNaN(newCurrentHealth)) {
-            FirstAid.LOGGER.warn("New current health is not a number, setting it to 0!");
-            newCurrentHealth = 0.0F;
-         }
-
-         if (newCurrentHealth <= 0.0F) {
-            FirstAid.LOGGER.error("Got {} health left, but isn't marked as dead!", newCurrentHealth);
-         } else {
-            if (!world.isClientSide() && this.resyncTimer != -1) {
-               this.resyncTimer--;
-               if (this.resyncTimer == 0) {
-                  this.resyncTimer = -1;
-                  if (player instanceof ServerPlayer serverPlayer) {
-                     FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
-                  }
-               }
+            for (IDebuff iDebuff : debuffs) {
+                if (!(iDebuff instanceof SharedDebuff)) continue;
+                SharedDebuff sharedDebuff = (SharedDebuff)iDebuff;
+                this.sharedDebuffs.add(sharedDebuff);
             }
+        }
+    }
 
-            if (Float.isInfinite(newCurrentHealth)) {
-               FirstAid.LOGGER.error("Error calculating current health: Value was infinite");
+    @Override
+    public void tick(Level world, Player player) {
+        if (!this.isDead(player)) {
+            if (this.sleepBlockTicks > 0) {
+                --this.sleepBlockTicks;
+            } else if (this.sleepBlockTicks < 0) {
+                throw new RuntimeException("Negative sleepBlockTicks " + this.sleepBlockTicks);
+            }
+            float newCurrentHealth = this.calculateNewCurrentHealth(player);
+            if (Float.isNaN(newCurrentHealth)) {
+                FirstAid.LOGGER.warn("New current health is not a number, setting it to 0!");
+                newCurrentHealth = 0.0f;
+            }
+            if (newCurrentHealth <= 0.0f) {
+                FirstAid.LOGGER.error("Got {} health left, but isn't marked as dead!", (Object)Float.valueOf(newCurrentHealth));
             } else {
-               this.syncVanillaHealth(player, newCurrentHealth);
-               this.prevHealthCurrent = newCurrentHealth;
+                if (!world.isClientSide() && this.resyncTimer != -1) {
+                    --this.resyncTimer;
+                    if (this.resyncTimer == 0) {
+                        this.resyncTimer = -1;
+                        if (player instanceof ServerPlayer) {
+                            ServerPlayer serverPlayer = (ServerPlayer)player;
+                            FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+                        }
+                    }
+                }
+                if (Float.isInfinite(newCurrentHealth)) {
+                    FirstAid.LOGGER.error("Error calculating current health: Value was infinite");
+                } else {
+                    this.syncVanillaHealth(player, newCurrentHealth);
+                    this.prevHealthCurrent = newCurrentHealth;
+                }
+                if (!this.hasTutorial) {
+                    this.hasTutorial = CapProvider.tutorialDone.contains(player.getName().getString());
+                }
+                this.runScaleLogic(player);
+                Holder<MobEffect> painkillerEffect = RegistryObjects.PAINKILLER_EFFECT;
+                Holder<MobEffect> morphineEffect = RegistryObjects.MORPHINE_EFFECT;
+                // Never re-apply a zero/expired morphine dose (prevents sticky 00:00 after milk/clear).
+                if (this.needsMorphineUpdate && this.morphineTicksLeft > 0) {
+                    player.addEffect(new MobEffectInstance(morphineEffect, this.morphineTicksLeft, 0, false, false));
+                }
+                MobEffectInstance morphine = player.getEffect(morphineEffect);
+                MobEffectInstance painkiller = player.getEffect(painkillerEffect);
+                if (!this.needsMorphineUpdate) {
+                    this.morphineTicksLeft = morphine == null ? 0 : Math.max(0, morphine.getDuration());
+                }
+                if (this.morphineTicksLeft <= 0) {
+                    this.morphineTicksLeft = 0;
+                    this.morphineMaxTicks = 0;
+                } else {
+                    this.trackMorphineMaxDuration();
+                }
+                this.needsMorphineUpdate = false;
+                if (!world.isClientSide()) {
+                    this.tickPendingMedicineActivations(player);
+                    this.updateMedicalState(player);
+                }
+                // Pose/attributes must run on client too �?forced pose is not automatically synced.
+                if (this.unconsciousTicks > 0) {
+                    this.applyUnconsciousPenalties(player);
+                } else {
+                    this.clearUnconsciousPenalties(player);
+                }
+                // Client: keep the higher of synced pain and locally calculated injury pain.
+                if (world.isClientSide()) {
+                    int localPain = this.calculatePainLevel();
+                    if (this.isWithdrawalEpisodeActive()) {
+                        localPain = Math.max(localPain, this.getAddictionPainLevel());
+                    }
+                    this.painLevel = Math.max(this.painLevel, localPain);
+                }
+                boolean painSuppressed = painkiller != null || morphine != null;
+                boolean healingStateChanged = false;
+                for (AbstractDamageablePart part : this) {
+                    float previousHealth = part.currentHealth;
+                    boolean hadHealer = part.activeHealer != null;
+                    part.tick(world, player, !painSuppressed, this.isUnconscious());
+                    if (world.isClientSide() || Float.compare(previousHealth, part.currentHealth) == 0 && hadHealer == (part.activeHealer != null)) continue;
+                    healingStateChanged = true;
+                }
+                if (!painSuppressed && !world.isClientSide()) {
+                    this.sharedDebuffs.forEach(sharedDebuff -> sharedDebuff.tick(player));
+                }
+                if (healingStateChanged && player instanceof ServerPlayer) {
+                    ServerPlayer serverPlayer = (ServerPlayer)player;
+                    this.painLevel = this.calculatePainLevel();
+                    FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+                }
             }
+        }
+    }
 
-            if (!this.hasTutorial) {
-               this.hasTutorial = CapProvider.tutorialDone.contains(player.getName().getString());
-            }
-
-            this.runScaleLogic(player);
-            Holder<MobEffect> morphineEffect = RegistryObjects.MORPHINE_EFFECT;
-            Holder<MobEffect> painkillerEffect = RegistryObjects.PAINKILLER_EFFECT;
-            if (this.needsMorphineUpdate) {
-               player.addEffect(new MobEffectInstance(morphineEffect, this.morphineTicksLeft, 0, false, false));
-               player.addEffect(new MobEffectInstance(painkillerEffect, this.morphineTicksLeft, 0, false, false));
-            }
-
-            MobEffectInstance morphine = player.getEffect(morphineEffect);
-            MobEffectInstance painkiller = player.getEffect(painkillerEffect);
-            if (!this.needsMorphineUpdate) {
-               this.morphineTicksLeft = morphine == null ? 0 : morphine.getDuration();
-            }
-
-            this.needsMorphineUpdate = false;
-            if (!world.isClientSide()) {
-               this.tickPendingMedicineActivations(player);
-               this.updateMedicalState(player);
-               if (this.unconsciousTicks > 0) {
-                  this.applyUnconsciousPenalties(player);
-               } else {
-                  this.clearUnconsciousPenalties(player);
-               }
-            }
-
-            boolean painSuppressed = morphine != null || painkiller != null;
-            boolean healingStateChanged = false;
-
-            for (AbstractDamageablePart part : this) {
-               float previousHealth = part.currentHealth;
-               boolean hadHealer = part.activeHealer != null;
-         part.tick(world, player, !painSuppressed, this.isUnconscious());
-               if (!world.isClientSide() && (Float.compare(previousHealth, part.currentHealth) != 0 || hadHealer != (part.activeHealer != null))) {
-                  healingStateChanged = true;
-               }
-            }
-
-            if (!painSuppressed && !world.isClientSide()) {
-               this.sharedDebuffs.forEach(sharedDebuff -> sharedDebuff.tick(player));
-            }
-
-            if (healingStateChanged && player instanceof ServerPlayer serverPlayer) {
-               this.painLevel = this.calculatePainLevel();
-               FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
-            }
-         }
-      }
-   }
-
-   public void syncVanillaHealth(Player player) {
-      float newCurrentHealth = this.calculateNewCurrentHealth(player);
-      if (Float.isNaN(newCurrentHealth)) {
-         FirstAid.LOGGER.warn("New current health is not a number, setting it to 0!");
-         newCurrentHealth = 0.0F;
-      }
-
-      if (Float.isInfinite(newCurrentHealth)) {
-         FirstAid.LOGGER.error("Error calculating current health: Value was infinite");
-         return;
-      }
-
-      this.syncVanillaHealth(player, newCurrentHealth);
-      this.prevHealthCurrent = newCurrentHealth;
-   }
-
-   private void syncVanillaHealth(Player player, float newCurrentHealth) {
-      if (newCurrentHealth != this.prevHealthCurrent) {
-         float syncedHealth = newCurrentHealth;
-         CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(syncedHealth));
-      }
-   }
-
-   public static int getRandMorphineDuration() {
-      return EventHandler.RAND.nextInt(5) * 20 * 15 + 9000;
-   }
-
-   public static int getMorphineActivationDelay() {
-      return FirstAid.getMorphineActivationDelayTicks();
-   }
-
-   public static int getPainkillerDuration() {
-      return 4800;
-   }
-
-   public static int getAdrenalineDuration() {
-      return ADRENALINE_DURATION_TICKS;
-   }
-
-   public static float getAdrenalineAbsorptionAmount() {
-      return 8.0F;
-   }
-
-   public static int getPainkillerActivationDelay() {
-      return FirstAid.getPainkillerActivationDelayTicks();
-   }
-
-   public void queuePainkillerActivation() {
-      this.pendingPainkillerTicks = Math.max(this.pendingPainkillerTicks, getPainkillerActivationDelay());
-      this.scheduleResync();
-   }
-
-   public void queueMorphineActivation() {
-      this.pendingMorphineDelayTicks = Math.max(this.pendingMorphineDelayTicks, getMorphineActivationDelay());
-      this.pendingMorphineEffectTicks = Math.max(this.pendingMorphineEffectTicks, getRandMorphineDuration());
-      this.scheduleResync();
-   }
-
-   @Deprecated
-   @Override
-   public void applyMorphine() {
-      this.morphineTicksLeft = getRandMorphineDuration();
-      this.needsMorphineUpdate = true;
-   }
-
-   @Override
-   public void applyMorphine(Player player) {
-      int duration = getRandMorphineDuration();
-      player.addEffect(new MobEffectInstance(RegistryObjects.MORPHINE_EFFECT, duration, 0, false, false));
-      player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, duration, 0, false, false));
-   }
-
-   @Deprecated
-   @Override
-   public int getMorphineTicks() {
-      return this.morphineTicksLeft;
-   }
-
-   @Override
-   public int getPainLevel() {
-      return this.painLevel;
-   }
-
-   @Override
-   public int getAdrenalineLevel() {
-      return this.adrenalineLevel;
-   }
-
-   @Override
-   public int getAdrenalineTicks() {
-      return this.adrenalineTicks;
-   }
-
-   public int getAdrenalineHeartbeatTriggerId() {
-      return this.adrenalineHeartbeatTriggerId;
-   }
-
-   public int getSuppressionLevel() {
-      return this.adrenalineLevel;
-   }
-
-   public float getSuppressionIntensity() {
-      return this.suppressionIntensity;
-   }
-
-   public int getSuppressionHoldTicks() {
-      return this.suppressionHoldTicks;
-   }
-
-   public void applyAdrenalineInjection(Player player) {
-      MobEffectInstance activePainkiller = player.getEffect(RegistryObjects.PAINKILLER_EFFECT);
-      MobEffectInstance activeAbsorption = player.getEffect(MobEffects.ABSORPTION);
-      MobEffectInstance activeHaste = player.getEffect(MobEffects.HASTE);
-      MobEffectInstance activeStrength = player.getEffect(MobEffects.STRENGTH);
-      MobEffectInstance activeSpeed = player.getEffect(MobEffects.SPEED);
-      int duration = Math.max(getAdrenalineDuration(), activePainkiller == null ? 0 : activePainkiller.getDuration());
-      int absorptionDuration = Math.max(getAdrenalineDuration(), activeAbsorption == null ? 0 : activeAbsorption.getDuration());
-      int absorptionAmplifier = Math.max(ADRENALINE_ABSORPTION_AMPLIFIER, activeAbsorption == null ? 0 : activeAbsorption.getAmplifier());
-      int hasteDuration = Math.max(getAdrenalineDuration(), activeHaste == null ? 0 : activeHaste.getDuration());
-      int hasteAmplifier = Math.max(ADRENALINE_HASTE_AMPLIFIER, activeHaste == null ? 0 : activeHaste.getAmplifier());
-      int strengthDuration = Math.max(getAdrenalineDuration(), activeStrength == null ? 0 : activeStrength.getDuration());
-      int strengthAmplifier = Math.max(ADRENALINE_STRENGTH_AMPLIFIER, activeStrength == null ? 0 : activeStrength.getAmplifier());
-      int speedDuration = Math.max(getAdrenalineDuration(), activeSpeed == null ? 0 : activeSpeed.getDuration());
-      int speedAmplifier = Math.max(ADRENALINE_SPEED_AMPLIFIER, activeSpeed == null ? 0 : activeSpeed.getAmplifier());
-      player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, duration, 0, false, false));
-      player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, absorptionDuration, absorptionAmplifier, false, false));
-      player.addEffect(new MobEffectInstance(MobEffects.HASTE, hasteDuration, hasteAmplifier, false, false));
-      player.addEffect(new MobEffectInstance(MobEffects.STRENGTH, strengthDuration, strengthAmplifier, false, false));
-      player.addEffect(new MobEffectInstance(MobEffects.SPEED, speedDuration, speedAmplifier, false, false));
-      player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 140, 0, false, false));
-      this.registerAdrenalineNearMiss(player, ADRENALINE_INJECTION_SUPPRESSION_STRENGTH, getAdrenalineDuration());
-      this.adrenalineHeartbeatTriggerId++;
-      this.scheduleResync();
-      if (!player.level().isClientSide() && player instanceof ServerPlayer serverPlayer) {
-         FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
-      }
-   }
-
-   @Override
-   public int getUnconsciousTicks() {
-      return this.unconsciousTicks;
-   }
-
-   @Override
-   public boolean isCriticalConditionActive() {
-      return this.criticalConditionActive;
-   }
-
-   public boolean isUnconscious() {
-      return this.unconsciousTicks > 0;
-   }
-
-   public boolean isCriticalDowned() {
-      return this.criticalConditionActive && this.unconsciousTicks > 0;
-   }
-
-   public float getIncomingPartDamageMultiplier(AbstractDamageablePart part) {
-      return this.isCriticalDowned() && part.canCauseDeath ? CRITICAL_DOWNED_CRITICAL_PART_DAMAGE_MULTIPLIER : 1.0F;
-   }
-
-   public boolean canGiveUp() {
-      return this.isUnconscious() && this.unconsciousAllowsGiveUp;
-   }
-
-   public boolean refreshRescueWakeUpState(Player player) {
-      if (!this.isRescueWakeUpRecoveryActive()) {
-         return false;
-      }
-
-      int delayTicks = FirstAid.rescueWakeUpEnabled ? FirstAid.getRescueWakeUpDelayTicks() : 0;
-      if (delayTicks <= 0) {
-         this.clearUnconsciousState();
-         this.resetRecoveredPlayerState(player);
-         CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(Math.max(player.getHealth(), 1.0F)));
-      } else {
-         this.unconsciousTicks = delayTicks;
-         this.unconsciousAllowsGiveUp = false;
-         this.unconsciousCausesDeath = false;
-         this.unconsciousReasonKey = UNCONSCIOUS_REASON_RECOVERING;
-      }
-
-      this.scheduleResync();
-      return true;
-   }
-
-   public float getCollapseAnimationProgress(float partialTick) {
-      return !this.isUnconscious()
-         ? 1.0F
-         : Mth.clamp(1.0F - (Math.max(0.0F, (float)this.collapseAnimationTicks) - Math.max(0.0F, partialTick)) / 12.0F, 0.0F, 1.0F);
-   }
-
-   public float getCollapseAnimationProgress() {
-      return this.getCollapseAnimationProgress(0.0F);
-   }
-
-   public String getUnconsciousReasonKey() {
-      return this.unconsciousReasonKey.isEmpty() ? "firstaid.gui.unconscious" : this.unconsciousReasonKey;
-   }
-
-   public int getUnconsciousSecondsLeft() {
-      return Math.max(1, (int)Math.ceil(this.unconsciousTicks / 20.0));
-   }
-
-   public static int getRescueDurationTicks() {
-      return RESCUE_DURATION_TICKS;
-   }
-
-   public static int getDefibrillatorRescueDurationTicks() {
-      return DEFIBRILLATOR_RESCUE_DURATION_TICKS;
-   }
-
-   public static int getExecutionDurationTicks() {
-      return EXECUTION_DURATION_TICKS;
-   }
-
-   public static double getRescueRange() {
-      return RESCUE_RANGE;
-   }
-
-   public float getPainVisualStrength() {
-      return this.painLevel <= 0 ? 0.0F : Math.min(1.0F, this.painLevel / 5.0F);
-   }
-
-   public float getDeathCountdownDangerProgress() {
-      if (!this.canGiveUp()) {
-         return 0.0F;
-      } else {
-         float remaining = Math.max(0.0F, (float)this.unconsciousTicks);
-         float progress = 1.0F - remaining / 3000.0F;
-         return Math.max(0.0F, Math.min(1.0F, progress));
-      }
-   }
-
-   public void registerAdrenalineNearMiss(Player player, float strength) {
-      this.registerAdrenalineNearMiss(player, strength, 80);
-   }
-
-   public void registerAdrenalineNearMiss(Player player, float strength, int holdTicks) {
-      float clampedStrength = Mth.clamp(strength, 0.35F, 1.45F);
-      float previousIntensity = this.suppressionIntensity;
-      int previousHoldTicks = this.suppressionHoldTicks;
-      int previousAdrenalineTicks = this.adrenalineTicks;
-      float baseIntensity = 0.28F + clampedStrength * 0.24F;
-      float addedIntensity = Mth.clamp(baseIntensity * 0.48F, 0.1728F, 0.2976F);
-      this.suppressionIntensity = Mth.clamp(this.suppressionIntensity + addedIntensity, 0.0F, 1.0F);
-      this.suppressionHoldTicks = Math.max(this.suppressionHoldTicks, holdTicks);
-      this.suppressionDecayTicker = 0;
-      MobEffectInstance activePainkiller = player.getEffect(RegistryObjects.PAINKILLER_EFFECT);
-      int painkillerDuration = Math.max(holdTicks, activePainkiller == null ? 0 : activePainkiller.getDuration());
-      player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, painkillerDuration, 0, false, false));
-      this.refreshSuppressionSnapshot();
-      if (previousIntensity != this.suppressionIntensity || previousHoldTicks != this.suppressionHoldTicks || previousAdrenalineTicks != this.adrenalineTicks) {
-         this.scheduleResync();
-      }
-   }
-
-   public void clearStatusEffects() {
-      this.morphineTicksLeft = 0;
-      this.pendingPainkillerTicks = 0;
-      this.pendingMorphineDelayTicks = 0;
-      this.pendingMorphineEffectTicks = 0;
-      this.painLevel = 0;
-      this.adrenalineLevel = 0;
-      this.adrenalineTicks = 0;
-      this.suppressionIntensity = 0.0F;
-      this.suppressionHoldTicks = 0;
-      this.suppressionDecayTicker = 0;
-      this.unconsciousTicks = 0;
-      this.criticalConditionActive = false;
-      this.unconsciousAllowsGiveUp = false;
-      this.unconsciousCausesDeath = false;
-      this.unconsciousReasonKey = "";
-      this.externalRevivePending = false;
-   }
-
-   public void markExternalRevivePending(Player player) {
-      this.externalRevivePending = true;
-      this.criticalConditionActive = false;
-      this.clearUnconsciousState();
-      this.resetRecoveredPlayerState(player);
-      this.scheduleResync();
-      if (!player.level().isClientSide() && player instanceof ServerPlayer serverPlayer) {
-         FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
-      }
-   }
-
-   public void handlePostDamage(Player player, @Nullable DamageSource source) {
-      if (this.hasNoRemainingBodyHealth() || this.hasAllCriticalPartsCollapsed()) {
-         this.criticalConditionActive = false;
-         this.clearUnconsciousState();
-         this.resetRecoveredPlayerState(player);
-         this.scheduleResync();
-      } else if (!this.criticalConditionActive && this.hasCriticalPartCollapsed()) {
-         if (CommonUtils.tryUseTotem(this, player, source)) {
+    public void syncVanillaHealth(Player player) {
+        float newCurrentHealth = this.calculateNewCurrentHealth(player);
+        if (Float.isNaN(newCurrentHealth)) {
+            FirstAid.LOGGER.warn("New current health is not a number, setting it to 0!");
+            newCurrentHealth = 0.0f;
+        }
+        if (Float.isInfinite(newCurrentHealth)) {
+            FirstAid.LOGGER.error("Error calculating current health: Value was infinite");
             return;
-         }
-         this.criticalConditionActive = true;
-         this.setUnconsciousState(3000, true, true, "firstaid.gui.critical_condition");
-         this.painLevel = Math.max(this.painLevel, 5);
-         CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(Math.max(player.getHealth(), 1.0F)));
-         this.scheduleResync();
-      }
-   }
+        }
+        this.syncVanillaHealth(player, newCurrentHealth);
+        this.prevHealthCurrent = newCurrentHealth;
+    }
 
-   public boolean canBeRescued() {
-      return this.criticalConditionActive && this.isUnconscious();
-   }
+    private void syncVanillaHealth(Player player, float newCurrentHealth) {
+        if (newCurrentHealth != this.prevHealthCurrent) {
+            float syncedHealth = newCurrentHealth;
+            CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(syncedHealth));
+        }
+    }
 
-   public boolean rescueFromCriticalState(Player player, @Nullable AbstractPartHealer healer) {
-      return this.rescueFromCriticalState(player, healer, FirstAid.rescueWakeUpEnabled);
-   }
+    public static int getRandMorphineDuration() {
+        return EventHandler.RAND.nextInt(5) * 20 * 15 + 9000;
+    }
 
-   public boolean rescueFromCriticalState(Player player, @Nullable AbstractPartHealer healer, boolean keepWakeUpDelay) {
-      return this.performCriticalRescue(player, healer, keepWakeUpDelay, 0.0F, 1.0F);
-   }
+    public int computeMorphineEffectDuration() {
+        return this.computeMorphineEffectDuration(PlayerDamageModel.getRandMorphineDuration());
+    }
+    /**
+     * Morphine effect duration is derived from the painkiller duration this use actually applies,
+     * then shortened by addiction. Always <= that painkiller window.
+     */
+    public int computeMorphineEffectDuration(int painkillerDurationFromThisUse) {
+        int pain = Math.max(20 * 60, painkillerDurationFromThisUse);
+        float factor = 1.0F - this.getAddictionNormalized() * 0.60F;
+        return Math.max(20 * 90, Math.min(pain, Math.round(pain * factor)));
+    }
 
-   public boolean defibrillatorRescueFromCriticalState(Player player, boolean keepWakeUpDelay) {
-      boolean rescued = this.performCriticalRescue(player, null, keepWakeUpDelay, 2.0F, 0.4F);
-      if (rescued) {
-         player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 400, 0, false, false));
-      }
 
-      return rescued;
-   }
+    public static int getMorphineActivationDelay() {
+        return FirstAid.getMorphineActivationDelayTicks();
+    }
 
-   private boolean performCriticalRescue(Player player, @Nullable AbstractPartHealer healer, boolean keepWakeUpDelay, float extraCriticalHealth, float wakeUpDelayMultiplier) {
-      if (!this.canBeRescued()) {
-         return false;
-      } else {
-         this.rescueCriticalParts(keepWakeUpDelay ? 1.0F : 2.0F);
-         if (extraCriticalHealth > 0.0F) {
-            this.restoreDamagedCriticalParts(extraCriticalHealth);
-         }
+    public static int getPainkillerDuration() {
+        return 4800;
+    }
 
-         if (!keepWakeUpDelay) {
-            this.rescueNonCriticalZeroParts(1.0F);
-         }
+    public static int getAdrenalineDuration() {
+        return 700;
+    }
 
-         this.criticalConditionActive = false;
-         this.painLevel = Math.max(2, this.painLevel);
-         if (keepWakeUpDelay) {
-            AbstractDamageablePart rescueTarget = this.getFirstCriticalRescueTarget();
-            if (healer != null && rescueTarget != null && rescueTarget.activeHealer == null) {
-               rescueTarget.activeHealer = healer;
-            }
+    public static float getAdrenalineAbsorptionAmount() {
+        return 8.0f;
+    }
 
-            this.setUnconsciousState(this.getScaledRescueWakeUpDelayTicks(wakeUpDelayMultiplier), false, false, "firstaid.gui.stabilizing");
-         } else {
+    public static int getPainkillerActivationDelay() {
+        return FirstAid.getPainkillerActivationDelayTicks();
+    }
+
+    public void queuePainkillerActivation() {
+        this.pendingPainkillerTicks = Math.max(this.pendingPainkillerTicks, PlayerDamageModel.getPainkillerActivationDelay());
+        this.scheduleResync();
+    }
+
+    public void queueMorphineActivation() {
+        this.pendingMorphineMedicalUse = this.isMedicalOpioidUse();
+        this.pendingMorphineDelayTicks = Math.max(this.pendingMorphineDelayTicks, PlayerDamageModel.getMorphineActivationDelay());
+        this.pendingMorphineEffectTicks = Math.max(this.pendingMorphineEffectTicks, PlayerDamageModel.getRandMorphineDuration());
+        this.scheduleResync();
+    }
+
+    @Override
+    @Deprecated
+    public void applyMorphine() {
+        int base = PlayerDamageModel.getRandMorphineDuration();
+        this.morphineTicksLeft = this.computeMorphineEffectDuration(base);
+        this.needsMorphineUpdate = true;
+    }
+
+    @Override
+    public void applyMorphine(Player player) {
+        this.applyOralMorphineEffects(player, PlayerDamageModel.getRandMorphineDuration(), this.isMedicalOpioidUse());
+    }
+
+    public void applyMorphineInjection(Player player) {
+        int basePainRelief = PlayerDamageModel.getRandMorphineDuration();
+        int painDuration = Math.round((float)basePainRelief * 2.5f);
+        MobEffectInstance activePainkiller = player.getEffect(RegistryObjects.PAINKILLER_EFFECT);
+        painDuration = Math.max(painDuration, activePainkiller == null ? 0 : activePainkiller.getDuration());
+        int morphineDuration = this.computeMorphineEffectDuration(painDuration);
+        MobEffectInstance activeMorphine = player.getEffect(RegistryObjects.MORPHINE_EFFECT);
+        morphineDuration = Math.max(morphineDuration, activeMorphine == null ? 0 : activeMorphine.getDuration());
+        player.addEffect(new MobEffectInstance(RegistryObjects.MORPHINE_EFFECT, morphineDuration, 0, false, false));
+        player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, painDuration, 0, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 3600, 0, false, false));
+        this.setMorphineDuration(morphineDuration);
+        this.needsMorphineUpdate = false;
+        this.forceMaxSuppression(player);
+        this.registerOpioidUse(player, true, this.isMedicalOpioidUse());
+        this.scheduleResync();
+        if (!player.level().isClientSide() && player instanceof ServerPlayer) {
+            ServerPlayer serverPlayer = (ServerPlayer)player;
+            FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+        }
+    }
+
+    private void applyOralMorphineEffects(Player player, int basePainReliefTicks, boolean medicalUse) {
+        int painDuration = Math.max(1200, basePainReliefTicks);
+        int morphineDuration = this.computeMorphineEffectDuration(painDuration);
+        morphineDuration = Math.min(morphineDuration, painDuration);
+        player.addEffect(new MobEffectInstance(RegistryObjects.MORPHINE_EFFECT, morphineDuration, 0, false, false));
+        player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, painDuration, 0, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 500, 0, false, false));
+        this.setMorphineDuration(morphineDuration);
+        this.needsMorphineUpdate = false;
+        this.registerOpioidUse(player, false, medicalUse);
+    }
+    private void forceMaxSuppression(Player player) {
+        this.forceMaxSuppression(player, FORCE_MAX_SUPPRESSION_HOLD_TICKS);
+    }
+
+    private void forceMaxSuppression(Player player, int holdTicks) {
+        float previousIntensity = this.suppressionIntensity;
+        int previousHoldTicks = this.suppressionHoldTicks;
+        int previousAdrenalineTicks = this.adrenalineTicks;
+        int effectiveHold = Mth.clamp(holdTicks, 1, FORCE_MAX_SUPPRESSION_HOLD_TICKS);
+        this.suppressionIntensity = MAX_SUPPRESSION_INTENSITY;
+        this.suppressionHoldTicks = Math.max(this.suppressionHoldTicks, effectiveHold);
+        this.suppressionHoldTicks = Math.min(this.suppressionHoldTicks, FORCE_MAX_SUPPRESSION_HOLD_TICKS);
+        this.suppressionDecayTicker = 0;
+        this.refreshSuppressionSnapshot();
+        if (Float.compare(previousIntensity, this.suppressionIntensity) != 0 || previousHoldTicks != this.suppressionHoldTicks || previousAdrenalineTicks != this.adrenalineTicks) {
+            this.scheduleResync();
+        }
+    }
+
+    @Override
+    @Deprecated
+    public int getMorphineTicks() {
+        return this.morphineTicksLeft;
+    }
+
+    public int getMorphineMaxTicks() {
+        return this.morphineMaxTicks;
+    }
+
+    public float getMorphineRemainingRatio() {
+        if (this.morphineTicksLeft <= 0 || this.morphineMaxTicks <= 0) {
+            return 0.0F;
+        }
+        return Mth.clamp(this.morphineTicksLeft / (float) this.morphineMaxTicks, 0.0F, 1.0F);
+    }
+
+    private void setMorphineDuration(int duration) {
+        this.morphineTicksLeft = Math.max(0, duration);
+        if (this.morphineTicksLeft <= 0) {
+            this.morphineMaxTicks = 0;
+        } else {
+            this.morphineMaxTicks = Math.max(this.morphineMaxTicks, this.morphineTicksLeft);
+        }
+    }
+
+    private void trackMorphineMaxDuration() {
+        if (this.morphineTicksLeft <= 0) {
+            this.morphineMaxTicks = 0;
+        } else if (this.morphineTicksLeft > this.morphineMaxTicks) {
+            this.morphineMaxTicks = this.morphineTicksLeft;
+        }
+    }
+
+
+    @Override
+    public int getPainLevel() {
+        return this.painLevel;
+    }
+
+    @Override
+    public int getAdrenalineLevel() {
+        return this.adrenalineLevel;
+    }
+
+    @Override
+    public int getAdrenalineTicks() {
+        return this.adrenalineTicks;
+    }
+
+    public int getAdrenalineHeartbeatTriggerId() {
+        return this.adrenalineHeartbeatTriggerId;
+    }
+
+    public int getSuppressionLevel() {
+        return this.adrenalineLevel;
+    }
+
+    public float getSuppressionIntensity() {
+        return this.suppressionIntensity;
+    }
+
+    public int getSuppressionHoldTicks() {
+        return this.suppressionHoldTicks;
+    }
+
+    public void applyAdrenalineInjection(Player player) {
+        MobEffectInstance activePainkiller = player.getEffect(RegistryObjects.PAINKILLER_EFFECT);
+        MobEffectInstance activeAbsorption = player.getEffect(MobEffects.ABSORPTION);
+        MobEffectInstance activeHaste = player.getEffect(MobEffects.HASTE);
+        MobEffectInstance activeStrength = player.getEffect(MobEffects.STRENGTH);
+        MobEffectInstance activeSpeed = player.getEffect(MobEffects.SPEED);
+        int duration = Math.max(PlayerDamageModel.getAdrenalineDuration(), activePainkiller == null ? 0 : activePainkiller.getDuration());
+        int absorptionDuration = Math.max(PlayerDamageModel.getAdrenalineDuration(), activeAbsorption == null ? 0 : activeAbsorption.getDuration());
+        int absorptionAmplifier = Math.max(1, activeAbsorption == null ? 0 : activeAbsorption.getAmplifier());
+        int hasteDuration = Math.max(PlayerDamageModel.getAdrenalineDuration(), activeHaste == null ? 0 : activeHaste.getDuration());
+        int hasteAmplifier = Math.max(0, activeHaste == null ? 0 : activeHaste.getAmplifier());
+        int strengthDuration = Math.max(PlayerDamageModel.getAdrenalineDuration(), activeStrength == null ? 0 : activeStrength.getDuration());
+        int strengthAmplifier = Math.max(0, activeStrength == null ? 0 : activeStrength.getAmplifier());
+        int speedDuration = Math.max(PlayerDamageModel.getAdrenalineDuration(), activeSpeed == null ? 0 : activeSpeed.getDuration());
+        int speedAmplifier = Math.max(0, activeSpeed == null ? 0 : activeSpeed.getAmplifier());
+        player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, duration, 0, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, absorptionDuration, absorptionAmplifier, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.HASTE, hasteDuration, hasteAmplifier, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.STRENGTH, strengthDuration, strengthAmplifier, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.SPEED, speedDuration, speedAmplifier, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 140, 0, false, false));
+        this.registerAdrenalineNearMiss(player, 0.35f, PlayerDamageModel.getAdrenalineDuration());
+        ++this.adrenalineHeartbeatTriggerId;
+        this.scheduleResync();
+        if (!player.level().isClientSide() && player instanceof ServerPlayer) {
+            ServerPlayer serverPlayer = (ServerPlayer)player;
+            FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+        }
+    }
+
+    @Override
+    public int getUnconsciousTicks() {
+        return this.unconsciousTicks;
+    }
+
+    @Override
+    public boolean isCriticalConditionActive() {
+        return this.criticalConditionActive;
+    }
+
+    public boolean isUnconscious() {
+        return this.unconsciousTicks > 0;
+    }
+
+    public boolean isCriticalDowned() {
+        return this.criticalConditionActive && this.unconsciousTicks > 0;
+    }
+
+    public float getIncomingPartDamageMultiplier(AbstractDamageablePart part) {
+        return this.isCriticalDowned() && part.canCauseDeath ? 0.1f : 1.0f;
+    }
+
+    public boolean canGiveUp() {
+        return this.isUnconscious() && this.unconsciousAllowsGiveUp;
+    }
+
+    public boolean refreshRescueWakeUpState(Player player) {
+        if (!this.isRescueWakeUpRecoveryActive()) {
+            return false;
+        }
+        int delayTicks = FirstAid.rescueWakeUpEnabled ? FirstAid.getRescueWakeUpDelayTicks() : 0;
+        int n = delayTicks;
+        if (delayTicks <= 0) {
             this.clearUnconsciousState();
             this.resetRecoveredPlayerState(player);
-            CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(Math.max(player.getHealth(), 1.0F)));
-         }
-
-         this.scheduleResync();
-         if (player instanceof ServerPlayer serverPlayer) {
-            FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
-         }
-
-         return true;
-      }
-   }
-
-   private int getScaledRescueWakeUpDelayTicks(float multiplier) {
-      int delayTicks = FirstAid.getRescueWakeUpDelayTicks();
-      return delayTicks <= 0 ? 0 : Math.max(1, Math.round((float)delayTicks * multiplier));
-   }
-
-   public void giveUp(Player player) {
-      if (this.canGiveUp()) {
-         this.criticalConditionActive = false;
-         this.clearUnconsciousState();
-         this.resetRecoveredPlayerState(player);
-         this.scheduleResync();
-         CommonUtils.killPlayer(this, player, null);
-      }
-   }
-
-   public void refreshPainState(Player player) {
-      int previousPainLevel = this.painLevel;
-      this.painLevel = this.calculatePainLevel();
-      if (previousPainLevel != this.painLevel) {
-         this.scheduleResync();
-         if (!player.level().isClientSide() && player instanceof ServerPlayer serverPlayer) {
-            FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
-         }
-      }
-   }
-
-   @Nonnull
-   @Override
-   public Iterator<AbstractDamageablePart> iterator() {
-      return new Iterator<AbstractDamageablePart>() {
-         private byte count = 0;
-
-         @Override
-         public boolean hasNext() {
-            return this.count < 8;
-         }
-
-         public AbstractDamageablePart next() {
-            if (this.count >= 8) {
-               throw new NoSuchElementException();
-            } else {
-               AbstractDamageablePart part = PlayerDamageModel.this.getFromEnum(EnumPlayerPart.VALUES[this.count]);
-               this.count++;
-               return part;
-            }
-         }
-      };
-   }
-
-   private float calculateNewCurrentHealth(Player player) {
-      float currentHealth = 0.0F;
-      FirstAidConfig.Server.VanillaHealthCalculationMode mode = FirstAidConfig.SERVER.vanillaHealthCalculation.get();
-      if (this.noCritical) {
-         mode = FirstAidConfig.Server.VanillaHealthCalculationMode.AVERAGE_ALL;
-      }
-      float scaledHealth = switch (mode) {
-         case AVERAGE_CRITICAL -> {
-            int maxHealth = 0;
-
-            for (AbstractDamageablePart part : this) {
-               if (part.canCauseDeath) {
-                  currentHealth += part.currentHealth;
-                  maxHealth += part.getMaxHealth();
-               }
-            }
-
-            yield currentHealth / maxHealth;
-         }
-         case MIN_CRITICAL -> {
-            AbstractDamageablePart minimal = null;
-            float lowest = Float.MAX_VALUE;
-
-            for (AbstractDamageablePart part : this) {
-               if (part.canCauseDeath) {
-                  float partCurrentHealth = part.currentHealth;
-                  if (partCurrentHealth < lowest) {
-                     minimal = part;
-                     lowest = partCurrentHealth;
-                  }
-               }
-            }
-
-            Objects.requireNonNull(minimal);
-            yield minimal.currentHealth / minimal.getMaxHealth();
-         }
-         case AVERAGE_ALL -> {
-            for (AbstractDamageablePart part : this) {
-               currentHealth += part.currentHealth;
-            }
-
-            yield currentHealth / this.getCurrentMaxHealth();
-         }
-         case CRITICAL_50_PERCENT_OTHER_50_PERCENT -> {
-            float currentNormal = 0.0F;
-            int maxNormal = 0;
-            float currentCritical = 0.0F;
-            int maxCritical = 0;
-
-            for (AbstractDamageablePart part : this) {
-               if (!part.canCauseDeath) {
-                  currentNormal += part.currentHealth;
-                  maxNormal += part.getMaxHealth();
-               } else {
-                  currentCritical += part.currentHealth;
-                  maxCritical += part.getMaxHealth();
-               }
-            }
-
-            float avgNormal = currentNormal / maxNormal;
-            float avgCritical = currentCritical / maxCritical;
-            yield (avgCritical + avgNormal) / 2.0F;
-         }
-         default -> throw new RuntimeException("Unknown constant " + mode);
-      } * player.getMaxHealth();
-      // Do not force vanilla health to full when limited natural regen is saturated.
-      // That used to stop Regeneration potions and other external heals from applying,
-      // while body parts remained stuck around naturalRegenLimitRatio (e.g. 85% -> 34/40).
-      // LIMITED/LIMITED2 still only cap food natural regen in HealthDistribution.applyNaturalRegen.
-      return this.isCriticalDowned() && this.hasCriticalPartCollapsed() && !this.hasAllCriticalPartsCollapsed() ? Math.max(1.0F, scaledHealth) : scaledHealth;
-   }
-
-   @Override
-   public boolean isDead(@Nullable Player player) {
-      boolean bleeding = PRCompatManager.getHandler().isBleeding(player);
-      if (bleeding) {
-         return true;
-      } else if (player != null && !player.isAlive()) {
-         return true;
-      } else if (this.hasNoRemainingBodyHealth()) {
-         return true;
-      } else if (this.hasAllCriticalPartsCollapsed()) {
-         return true;
-      } else if (this.isCriticalDowned()) {
-         return false;
-      } else if (!this.noCritical) {
-         for (AbstractDamageablePart part : this) {
-            if (part.canCauseDeath && part.currentHealth <= 0.0F) {
-               return true;
-            }
-         }
-
-         return false;
-      } else {
-         boolean dead = true;
-
-         for (AbstractDamageablePart partx : this) {
-            if (partx.currentHealth > 0.0F) {
-               dead = false;
-               break;
-            }
-         }
-
-         return dead;
-      }
-   }
-
-   @Override
-   public int getMaxRenderSize() {
-      int max = 0;
-
-      for (AbstractDamageablePart part : this) {
-         int newMax;
-         if (FirstAidConfig.CLIENT.overlayMode.get() == FirstAidConfig.Client.OverlayMode.NUMBERS) {
-            newMax = ClientAccess.getTextWidth(TEXT_FORMAT.format(part.currentHealth) + "/" + part.getMaxHealth()) + 1;
-         } else {
-            newMax = (int)(((int)(part.getMaxHealth() + 0.9999F) + 1) / 2.0F * 9.0F);
-         }
-
-         max = Math.max(max, newMax);
-      }
-
-      return max;
-   }
-
-   @Override
-   public void sleepHeal(Player player) {
-      if (this.sleepBlockTicks <= 0) {
-         CommonUtils.healAllPartsByPercentage(FirstAidConfig.SERVER.sleepHealPercentage.get(), this, player);
-         this.refreshPainState(player);
-         this.sleepBlockTicks = 20;
-      }
-   }
-
-   @Override
-   public int getCurrentMaxHealth() {
-      int maxHealth = 0;
-
-      for (AbstractDamageablePart part : this) {
-         maxHealth += part.getMaxHealth();
-      }
-
-      return maxHealth;
-   }
-
-   @Override
-   public void revivePlayer(Player player) {
-      if (FirstAidConfig.GENERAL.debug.get()) {
-         CommonUtils.debugLogStacktrace("Reviving player");
-      }
-
-      this.clearStatusEffects();
-      this.externalRevivePending = false;
-
-      for (AbstractDamageablePart part : this) {
-         if ((part.canCauseDeath || this.noCritical) && part.currentHealth <= 0.0F) {
-            part.currentHealth = 1.0F;
-         }
-      }
-
-      if (FirstAid.rescueWakeUpEnabled && FirstAid.getRescueWakeUpDelayTicks() > 0) {
-         this.setUnconsciousState(FirstAid.getRescueWakeUpDelayTicks(), false, false, UNCONSCIOUS_REASON_RECOVERING);
-      }
-
-      if (!player.level().isClientSide() && player instanceof ServerPlayer serverPlayer) {
-         FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
-      }
-   }
-
-   @Override
-   public void runScaleLogic(Player player) {
-      if (FirstAidConfig.SERVER.scaleMaxHealth.get()) {
-         float globalFactor = player.getMaxHealth() / 20.0F;
-         if (this.prevScaleFactor != globalFactor) {
-            if (Math.abs(globalFactor - 1.0F) < 1.0E-6F) {
-               for (AbstractDamageablePart part : this) {
-                  part.setMaxHealth(part.initialMaxHealth);
-               }
-
-               this.prevScaleFactor = globalFactor;
-               return;
-            }
-
-            if (FirstAidConfig.GENERAL.debug.get()) {
-               FirstAid.LOGGER.info("Starting health scaling factor {} -> {} (max health {})", this.prevScaleFactor, globalFactor, player.getMaxHealth());
-            }
-
-            int reduced = 0;
-            int added = 0;
-            float expectedNewMaxHealth = 0.0F;
-            int newMaxHealth = 0;
-
-            for (AbstractDamageablePart part : this) {
-               float floatResult = part.initialMaxHealth * globalFactor;
-               expectedNewMaxHealth += floatResult;
-               int result = (int)floatResult;
-               if (result % 2 == 1) {
-                  int partMaxHealth = part.getMaxHealth();
-                  if (part.currentHealth < partMaxHealth && reduced < 4) {
-                     result--;
-                     reduced++;
-                  } else if (part.currentHealth > partMaxHealth && added < 4) {
-                     result++;
-                     added++;
-                  } else if (reduced > added) {
-                     result++;
-                     added++;
-                  } else {
-                     result--;
-                     reduced++;
-                  }
-               }
-
-               newMaxHealth += result;
-               if (FirstAidConfig.GENERAL.debug.get()) {
-                  FirstAid.LOGGER.info("Part {} max health: {} initial; {} old; {} new", part.part.name(), part.initialMaxHealth, part.getMaxHealth(), result);
-               }
-
-               part.setMaxHealth(result);
-            }
-
-            if (Math.abs(expectedNewMaxHealth - newMaxHealth) >= 2.0F) {
-               if (FirstAidConfig.GENERAL.debug.get()) {
-                  FirstAid.LOGGER.info("Entering second stage - diff {}", Math.abs(expectedNewMaxHealth - newMaxHealth));
-               }
-
-               List<AbstractDamageablePart> prioList = new ArrayList<>();
-
-               for (AbstractDamageablePart part : this) {
-                  prioList.add(part);
-               }
-
-               prioList.sort(Comparator.comparingInt(AbstractDamageablePart::getMaxHealth));
-
-               for (AbstractDamageablePart part : prioList) {
-                  int maxHealth = part.getMaxHealth();
-                  if (FirstAidConfig.GENERAL.debug.get()) {
-                     FirstAid.LOGGER.info("Part {}: Second stage with total diff {}", part.part.name(), Math.abs(expectedNewMaxHealth - newMaxHealth));
-                  }
-
-                  if (expectedNewMaxHealth > newMaxHealth) {
-                     part.setMaxHealth(maxHealth + 2);
-                     newMaxHealth += part.getMaxHealth() - maxHealth;
-                  } else if (expectedNewMaxHealth < newMaxHealth) {
-                     part.setMaxHealth(maxHealth - 2);
-                     newMaxHealth -= maxHealth - part.getMaxHealth();
-                  }
-
-                  if (Math.abs(expectedNewMaxHealth - newMaxHealth) < 2.0F) {
-                     break;
-                  }
-               }
-            }
-         }
-
-         this.prevScaleFactor = globalFactor;
-      }
-   }
-
-   @Override
-   public void scheduleResync() {
-      if (this.resyncTimer == -1 || this.resyncTimer > 3) {
-         this.resyncTimer = 3;
-      }
-   }
-
-   @Override
-   public boolean hasNoCritical() {
-      return this.noCritical;
-   }
-
-   private boolean isPainSuppressed(Player player) {
-      return this.morphineTicksLeft > 0 || player.hasEffect(RegistryObjects.MORPHINE_EFFECT) || player.hasEffect(RegistryObjects.PAINKILLER_EFFECT);
-   }
-
-   private void tickPendingMedicineActivations(Player player) {
-      boolean changed = false;
-      if (this.pendingPainkillerTicks > 0) {
-         this.pendingPainkillerTicks--;
-         if (this.pendingPainkillerTicks == 0) {
-            player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, getPainkillerDuration(), 0, false, false));
-            changed = true;
-         }
-      }
-
-      if (this.pendingMorphineDelayTicks > 0) {
-         this.pendingMorphineDelayTicks--;
-         if (this.pendingMorphineDelayTicks == 0 && this.pendingMorphineEffectTicks > 0) {
-            int duration = this.pendingMorphineEffectTicks;
-            this.pendingMorphineEffectTicks = 0;
-            player.addEffect(new MobEffectInstance(RegistryObjects.MORPHINE_EFFECT, duration, 0, false, false));
-            player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, duration, 0, false, false));
-            changed = true;
-         }
-      }
-
-      if (changed) {
-         this.scheduleResync();
-      }
-   }
-
-   private void updateMedicalState(Player player) {
-      boolean previousUnconsciousState = this.isUnconscious();
-      int previousPainLevel = this.painLevel;
-      int previousAdrenalineLevel = this.adrenalineLevel;
-      int previousAdrenalineTicks = this.adrenalineTicks;
-      float previousSuppressionIntensity = this.suppressionIntensity;
-      int previousSuppressionHoldTicks = this.suppressionHoldTicks;
-      int previousUnconsciousTicks = this.unconsciousTicks;
-      boolean previousCriticalCondition = this.criticalConditionActive;
-      boolean previousGiveUpState = this.unconsciousAllowsGiveUp;
-      boolean previousDeathState = this.unconsciousCausesDeath;
-      String previousUnconsciousReasonKey = this.unconsciousReasonKey;
-      if (this.resolveExternalReviveState(player)) {
-         return;
-      }
-
-      this.painLevel = this.calculatePainLevel();
-      this.tickSuppressionState();
-      if (this.criticalConditionActive && !this.hasCriticalPartCollapsed()) {
-         this.criticalConditionActive = false;
-         if (this.unconsciousCausesDeath) {
+            CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(Math.max(player.getHealth(), 1.0f)));
+        } else {
+            this.unconsciousTicks = delayTicks;
             this.unconsciousAllowsGiveUp = false;
             this.unconsciousCausesDeath = false;
-            if (this.unconsciousReasonKey.equals("firstaid.gui.critical_condition")) {
-               this.unconsciousReasonKey = "firstaid.gui.stabilizing";
-               this.refreshRescueWakeUpState(player);
-            }
-         }
-      }
+            this.unconsciousReasonKey = UNCONSCIOUS_REASON_RECOVERING;
+        }
+        this.scheduleResync();
+        return true;
+    }
 
-      if (this.unconsciousTicks > 0) {
-         this.unconsciousTicks--;
-      }
+    public float getCollapseAnimationProgress(float partialTick) {
+        return !this.isUnconscious() ? 1.0f : Mth.clamp((float)(1.0f - (Math.max(0.0f, (float)this.collapseAnimationTicks) - Math.max(0.0f, partialTick)) / 12.0f), (float)0.0f, (float)1.0f);
+    }
 
-      if (this.criticalConditionActive && this.unconsciousTicks <= 0 && this.unconsciousCausesDeath) {
-         this.resetRecoveredPlayerState(player);
-         CommonUtils.killPlayerDirectly(player, null);
-         return;
-      }
+    public float getCollapseAnimationProgress() {
+        return this.getCollapseAnimationProgress(0.0f);
+    }
 
-      if (this.unconsciousTicks <= 0) {
-         this.clearUnconsciousState();
-      }
+    public String getUnconsciousReasonKey() {
+        return this.unconsciousReasonKey.isEmpty() ? "firstaid.gui.unconscious" : this.unconsciousReasonKey;
+    }
 
-      if (previousPainLevel != this.painLevel
-         || previousAdrenalineLevel != this.adrenalineLevel
-         || previousAdrenalineTicks != this.adrenalineTicks
-         || Float.compare(previousSuppressionIntensity, this.suppressionIntensity) != 0
-         || previousSuppressionHoldTicks != this.suppressionHoldTicks
-         || previousUnconsciousTicks != this.unconsciousTicks
-         || previousCriticalCondition != this.criticalConditionActive
-         || previousGiveUpState != this.unconsciousAllowsGiveUp
-         || previousDeathState != this.unconsciousCausesDeath
-         || !Objects.equals(previousUnconsciousReasonKey, this.unconsciousReasonKey)) {
-         this.scheduleResync();
-      }
+    public int getUnconsciousSecondsLeft() {
+        return Math.max(1, (int)Math.ceil((double)this.unconsciousTicks / 20.0));
+    }
 
-      if (this.painLevel == 0 && this.adrenalineTicks == 0 && this.unconsciousTicks == 0 && !this.isPainSuppressed(player)) {
-         this.unconsciousAllowsGiveUp = false;
-         this.unconsciousCausesDeath = false;
-         this.unconsciousReasonKey = "";
-      }
+    public static int getRescueDurationTicks() {
+        return 160;
+    }
 
-      if (this.collapseAnimationTicks > 0) {
-         this.collapseAnimationTicks--;
-      }
+    public static int getDefibrillatorRescueDurationTicks() {
+        return 60;
+    }
 
-      if (previousUnconsciousState != this.isUnconscious()) {
-         if (this.isUnconscious()) {
-            this.collapseAnimationTicks = 12;
-            this.collapsePlacementPending = true;
-            player.refreshDimensions();
-         } else {
-            this.collapseAnimationTicks = 0;
-            this.collapsePlacementPending = false;
-            this.resetRecoveredPlayerState(player);
-         }
-      }
-   }
+    public static int getExecutionDurationTicks() {
+        return 100;
+    }
 
-   private boolean resolveExternalReviveState(Player player) {
-      if (!this.externalRevivePending || PRCompatManager.getHandler().isBleeding(player)) {
-         return false;
-      }
+    public static double getRescueRange() {
+        return 3.0;
+    }
 
-      this.externalRevivePending = false;
-      if (player.isAlive() && player.getHealth() > 0.0F) {
-         this.revivePlayer(player);
-      } else {
-         this.clearStatusEffects();
-         this.resetRecoveredPlayerState(player);
-         this.scheduleResync();
-         if (!player.level().isClientSide() && player instanceof ServerPlayer serverPlayer) {
+    public float getPainVisualStrength() {
+        return this.painLevel <= 0 ? 0.0f : Math.min(1.0f, (float)this.painLevel / 5.0f);
+    }
+
+    public float getDeathCountdownDangerProgress() {
+        if (!this.canGiveUp()) {
+            return 0.0f;
+        }
+        float remaining = Math.max(0.0f, (float)this.unconsciousTicks);
+        float progress = 1.0f - remaining / 3000.0f;
+        return Math.max(0.0f, Math.min(1.0f, progress));
+    }
+
+    public void registerAdrenalineNearMiss(Player player, float strength) {
+        this.registerAdrenalineNearMiss(player, strength, 80);
+    }
+
+    public void registerAdrenalineNearMiss(Player player, float strength, int holdTicks) {
+        float clampedStrength = Mth.clamp((float)strength, (float)0.35f, (float)1.45f);
+        float previousIntensity = this.suppressionIntensity;
+        int previousHoldTicks = this.suppressionHoldTicks;
+        int previousAdrenalineTicks = this.adrenalineTicks;
+        float baseIntensity = 0.28f + clampedStrength * 0.24f;
+        float addedIntensity = Mth.clamp((float)(baseIntensity * 0.48f), (float)0.1728f, (float)0.2976f);
+        this.suppressionIntensity = Mth.clamp((float)(this.suppressionIntensity + addedIntensity), (float)0.0f, (float)1.0f);
+        this.suppressionHoldTicks = Math.max(this.suppressionHoldTicks, holdTicks);
+        this.suppressionDecayTicker = 0;
+        MobEffectInstance activePainkiller = player.getEffect(RegistryObjects.PAINKILLER_EFFECT);
+        int painkillerDuration = Math.max(holdTicks, activePainkiller == null ? 0 : activePainkiller.getDuration());
+        player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, painkillerDuration, 0, false, false));
+        this.refreshSuppressionSnapshot();
+        if (previousIntensity != this.suppressionIntensity || previousHoldTicks != this.suppressionHoldTicks || previousAdrenalineTicks != this.adrenalineTicks) {
+            this.scheduleResync();
+        }
+    }
+
+    /**
+     * Clears morphine/painkiller model state and effects (milk / debug clear).
+     */
+    public void clearPainSuppressants(Player player) {
+        this.morphineTicksLeft = 0;
+        this.morphineMaxTicks = 0;
+        this.needsMorphineUpdate = false;
+        this.pendingMorphineDelayTicks = 0;
+        this.pendingMorphineEffectTicks = 0;
+        this.pendingMorphineMedicalUse = false;
+        this.pendingPainkillerTicks = 0;
+        if (player != null) {
+            player.removeEffect(RegistryObjects.MORPHINE_EFFECT);
+            player.removeEffect(RegistryObjects.PAINKILLER_EFFECT);
+            this.clearAddictionPulseEffects(player);
+        }
+        this.scheduleResync();
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
             FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
-         }
-      }
-      return true;
-   }
+        }
+    }
 
-   private int calculatePainLevel() {
-      boolean hasInjury = false;
-      int fullyLostParts = 0;
-      float maxSeverity = 0.0F;
-      float weightedSeverity = 0.0F;
-      float totalWeight = 0.0F;
+    public void clearStatusEffects() {
+        this.morphineTicksLeft = 0;
+        this.morphineMaxTicks = 0;
+        this.needsMorphineUpdate = false;
+        this.pendingPainkillerTicks = 0;
+        this.pendingMorphineDelayTicks = 0;
+        this.pendingMorphineEffectTicks = 0;
+        this.pendingMorphineMedicalUse = false;
+        this.painLevel = 0;
+        this.adrenalineLevel = 0;
+        this.adrenalineTicks = 0;
+        this.suppressionIntensity = 0.0f;
+        this.suppressionHoldTicks = 0;
+        this.suppressionDecayTicker = 0;
+        this.unconsciousTicks = 0;
+        this.unconsciousMaxTicks = 0;
+        this.criticalConditionActive = false;
+        this.unconsciousAllowsGiveUp = false;
+        this.unconsciousCausesDeath = false;
+        this.unconsciousReasonKey = UNCONSCIOUS_REASON_NONE;
+        this.externalRevivePending = false;
+        this.withdrawalEpisodeType = 0;
+        this.withdrawalEpisodeTicksLeft = 0;
+        this.withdrawalCooldownTicks = 0;
+        this.addictionPulseType = 0;
+        this.addictionPulseTicks = 0;
+    }
 
-      for (AbstractDamageablePart part : this) {
-         float visualHealth = CommonUtils.getVisualHealth(part);
-         float missingHealth = CommonUtils.getVisibleMissingHealth(part);
-         if (!(missingHealth <= 0.0F)) {
+    public void markExternalRevivePending(Player player) {
+        this.externalRevivePending = true;
+        this.criticalConditionActive = false;
+        this.clearUnconsciousState();
+        this.resetRecoveredPlayerState(player);
+        this.scheduleResync();
+        if (!player.level().isClientSide() && player instanceof ServerPlayer) {
+            ServerPlayer serverPlayer = (ServerPlayer)player;
+            FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+        }
+    }
+
+    public void handlePostDamage(Player player, @Nullable DamageSource source) {
+        if (this.hasNoRemainingBodyHealth() || this.hasAllCriticalPartsCollapsed()) {
+            this.criticalConditionActive = false;
+            this.clearUnconsciousState();
+            this.resetRecoveredPlayerState(player);
+            this.scheduleResync();
+        } else if (!this.criticalConditionActive && this.hasCriticalPartCollapsed()) {
+            if (CommonUtils.tryUseTotem(this, player, source)) {
+                return;
+            }
+            this.criticalConditionActive = true;
+            this.setUnconsciousState(3000, true, true, UNCONSCIOUS_REASON_CRITICAL);
+            this.painLevel = Math.max(this.painLevel, 5);
+            CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(Math.max(player.getHealth(), 1.0f)));
+            this.scheduleResync();
+        }
+    }
+
+    public boolean canBeRescued() {
+        return this.criticalConditionActive && this.isUnconscious();
+    }
+
+    public boolean rescueFromCriticalState(Player player, @Nullable AbstractPartHealer healer) {
+        return this.rescueFromCriticalState(player, healer, FirstAid.rescueWakeUpEnabled);
+    }
+
+    public boolean rescueFromCriticalState(Player player, @Nullable AbstractPartHealer healer, boolean keepWakeUpDelay) {
+        return this.performCriticalRescue(player, healer, keepWakeUpDelay, 0.0f, 1.0f);
+    }
+
+    public boolean defibrillatorRescueFromCriticalState(Player player, boolean keepWakeUpDelay) {
+        boolean rescued = this.performCriticalRescue(player, null, keepWakeUpDelay, 2.0f, 0.4f);
+        if (rescued) {
+            player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 400, 0, false, false));
+        }
+        return rescued;
+    }
+
+    private boolean performCriticalRescue(Player player, @Nullable AbstractPartHealer healer, boolean keepWakeUpDelay, float extraCriticalHealth, float wakeUpDelayMultiplier) {
+        if (!this.canBeRescued()) {
+            return false;
+        }
+        this.rescueCriticalParts(keepWakeUpDelay ? 1.0f : 2.0f);
+        if (extraCriticalHealth > 0.0f) {
+            this.restoreDamagedCriticalParts(extraCriticalHealth);
+        }
+        if (!keepWakeUpDelay) {
+            this.rescueNonCriticalZeroParts(1.0f);
+        }
+        this.criticalConditionActive = false;
+        this.painLevel = Math.max(2, this.painLevel);
+        if (keepWakeUpDelay) {
+            AbstractDamageablePart rescueTarget = this.getFirstCriticalRescueTarget();
+            if (healer != null && rescueTarget != null && rescueTarget.activeHealer == null) {
+                rescueTarget.activeHealer = healer;
+            }
+            this.setUnconsciousState(this.getScaledRescueWakeUpDelayTicks(wakeUpDelayMultiplier), false, false, UNCONSCIOUS_REASON_RECOVERING);
+        } else {
+            this.clearUnconsciousState();
+            this.resetRecoveredPlayerState(player);
+            CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(Math.max(player.getHealth(), 1.0f)));
+        }
+        this.scheduleResync();
+        if (player instanceof ServerPlayer) {
+            ServerPlayer serverPlayer = (ServerPlayer)player;
+            FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+        }
+        return true;
+    }
+
+    private int getScaledRescueWakeUpDelayTicks(float multiplier) {
+        int delayTicks = FirstAid.getRescueWakeUpDelayTicks();
+        return delayTicks <= 0 ? 0 : Math.max(1, Math.round((float)delayTicks * multiplier));
+    }
+
+    public void giveUp(Player player) {
+        if (this.canGiveUp()) {
+            this.criticalConditionActive = false;
+            this.clearUnconsciousState();
+            this.resetRecoveredPlayerState(player);
+            this.scheduleResync();
+            CommonUtils.killPlayer(this, player, null);
+        }
+    }
+
+    public void refreshPainState(Player player) {
+        int previousPainLevel = this.painLevel;
+        this.painLevel = this.calculatePainLevel();
+        if (previousPainLevel != this.painLevel) {
+            this.scheduleResync();
+            if (!player.level().isClientSide() && player instanceof ServerPlayer) {
+                ServerPlayer serverPlayer = (ServerPlayer)player;
+                FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+            }
+        }
+    }
+
+    @Override
+    @Nonnull
+    public Iterator<AbstractDamageablePart> iterator() {
+        return new Iterator<AbstractDamageablePart>(){
+            private byte count = 0;
+
+            @Override
+            public boolean hasNext() {
+                return this.count < 8;
+            }
+
+            @Override
+            public AbstractDamageablePart next() {
+                if (this.count >= 8) {
+                    throw new NoSuchElementException();
+                }
+                AbstractDamageablePart part = PlayerDamageModel.this.getFromEnum(EnumPlayerPart.VALUES[this.count]);
+                this.count = (byte)(this.count + 1);
+                return part;
+            }
+        };
+    }
+
+    private float calculateNewCurrentHealth(Player player) {
+        float currentHealth = 0.0f;
+        FirstAidConfig.Server.VanillaHealthCalculationMode mode = FirstAidConfig.SERVER.vanillaHealthCalculation.get();
+        if (this.noCritical) {
+            mode = FirstAidConfig.Server.VanillaHealthCalculationMode.AVERAGE_ALL;
+        }
+        float scaledHealth = (switch (mode) {
+            case FirstAidConfig.Server.VanillaHealthCalculationMode.AVERAGE_CRITICAL -> {
+                int maxHealth = 0;
+                for (AbstractDamageablePart part : this) {
+                    if (!part.canCauseDeath) continue;
+                    currentHealth += part.currentHealth;
+                    maxHealth += part.getMaxHealth();
+                }
+                yield currentHealth / (float)maxHealth;
+            }
+            case FirstAidConfig.Server.VanillaHealthCalculationMode.MIN_CRITICAL -> {
+                AbstractDamageablePart minimal = null;
+                float lowest = Float.MAX_VALUE;
+                for (AbstractDamageablePart part : this) {
+                    float partCurrentHealth;
+                    if (!part.canCauseDeath || !((partCurrentHealth = part.currentHealth) < lowest)) continue;
+                    minimal = part;
+                    lowest = partCurrentHealth;
+                }
+                Objects.requireNonNull(minimal);
+                yield minimal.currentHealth / (float)minimal.getMaxHealth();
+            }
+            case FirstAidConfig.Server.VanillaHealthCalculationMode.AVERAGE_ALL -> {
+                for (AbstractDamageablePart part : this) {
+                    currentHealth += part.currentHealth;
+                }
+                yield currentHealth / (float)this.getCurrentMaxHealth();
+            }
+            case FirstAidConfig.Server.VanillaHealthCalculationMode.CRITICAL_50_PERCENT_OTHER_50_PERCENT -> {
+                float currentNormal = 0.0f;
+                int maxNormal = 0;
+                float currentCritical = 0.0f;
+                int maxCritical = 0;
+                for (AbstractDamageablePart part : this) {
+                    if (!part.canCauseDeath) {
+                        currentNormal += part.currentHealth;
+                        maxNormal += part.getMaxHealth();
+                        continue;
+                    }
+                    currentCritical += part.currentHealth;
+                    maxCritical += part.getMaxHealth();
+                }
+                float avgNormal = currentNormal / (float)maxNormal;
+                float avgCritical = currentCritical / (float)maxCritical;
+                yield (avgCritical + avgNormal) / 2.0f;
+            }
+            default -> throw new RuntimeException("Unknown constant " + String.valueOf((Object)mode));
+        }) * player.getMaxHealth();
+        return this.isCriticalDowned() && this.hasCriticalPartCollapsed() && !this.hasAllCriticalPartsCollapsed() ? Math.max(1.0f, scaledHealth) : scaledHealth;
+    }
+
+    @Override
+    public boolean isDead(@Nullable Player player) {
+        boolean bleeding = PRCompatManager.getHandler().isBleeding(player);
+        if (bleeding) {
+            return true;
+        }
+        if (player != null && !player.isAlive()) {
+            return true;
+        }
+        if (this.hasNoRemainingBodyHealth()) {
+            return true;
+        }
+        if (this.hasAllCriticalPartsCollapsed()) {
+            return true;
+        }
+        if (this.isCriticalDowned()) {
+            return false;
+        }
+        if (!this.noCritical) {
+            for (AbstractDamageablePart part : this) {
+                if (!part.canCauseDeath || !(part.currentHealth <= 0.0f)) continue;
+                return true;
+            }
+            return false;
+        }
+        boolean dead = true;
+        for (AbstractDamageablePart partx : this) {
+            if (!(partx.currentHealth > 0.0f)) continue;
+            dead = false;
+            break;
+        }
+        return dead;
+    }
+
+    @Override
+    public int getMaxRenderSize() {
+        int max = 0;
+        for (AbstractDamageablePart part : this) {
+            int newMax = FirstAidConfig.CLIENT.overlayMode.get() == FirstAidConfig.Client.OverlayMode.NUMBERS ? ClientAccess.getTextWidth(TEXT_FORMAT.format(part.currentHealth) + "/" + part.getMaxHealth()) + 1 : (int)((float)((int)((float)part.getMaxHealth() + 0.9999f) + 1) / 2.0f * 9.0f);
+            max = Math.max(max, newMax);
+        }
+        return max;
+    }
+
+    @Override
+    public void sleepHeal(Player player) {
+        if (this.sleepBlockTicks <= 0) {
+            CommonUtils.healAllPartsByPercentage(FirstAidConfig.SERVER.sleepHealPercentage.get(), this, player);
+            this.refreshPainState(player);
+            this.sleepBlockTicks = 20;
+        }
+    }
+
+    @Override
+    public int getCurrentMaxHealth() {
+        int maxHealth = 0;
+        for (AbstractDamageablePart part : this) {
+            maxHealth += part.getMaxHealth();
+        }
+        return maxHealth;
+    }
+
+    @Override
+    public void revivePlayer(Player player) {
+        if (FirstAidConfig.GENERAL.debug.get().booleanValue()) {
+            CommonUtils.debugLogStacktrace("Reviving player");
+        }
+        this.clearStatusEffects();
+        this.externalRevivePending = false;
+        for (AbstractDamageablePart part : this) {
+            if (!part.canCauseDeath && !this.noCritical || !(part.currentHealth <= 0.0f)) continue;
+            part.currentHealth = 1.0f;
+        }
+        if (FirstAid.rescueWakeUpEnabled && FirstAid.getRescueWakeUpDelayTicks() > 0) {
+            this.setUnconsciousState(FirstAid.getRescueWakeUpDelayTicks(), false, false, UNCONSCIOUS_REASON_RECOVERING);
+        }
+        if (!player.level().isClientSide() && player instanceof ServerPlayer) {
+            ServerPlayer serverPlayer = (ServerPlayer)player;
+            FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+        }
+    }
+
+    @Override
+    public void runScaleLogic(Player player) {
+        if (FirstAidConfig.SERVER.scaleMaxHealth.get().booleanValue()) {
+            float globalFactor = player.getMaxHealth() / 20.0f;
+            if (this.prevScaleFactor != globalFactor) {
+                if (Math.abs(globalFactor - 1.0f) < 1.0E-6f) {
+                    for (AbstractDamageablePart part : this) {
+                        part.setMaxHealth(part.initialMaxHealth);
+                    }
+                    this.prevScaleFactor = globalFactor;
+                    return;
+                }
+                if (FirstAidConfig.GENERAL.debug.get().booleanValue()) {
+                    FirstAid.LOGGER.info("Starting health scaling factor {} -> {} (max health {})", (Object)Float.valueOf(this.prevScaleFactor), (Object)Float.valueOf(globalFactor), (Object)Float.valueOf(player.getMaxHealth()));
+                }
+                int reduced = 0;
+                int added = 0;
+                float expectedNewMaxHealth = 0.0f;
+                int newMaxHealth = 0;
+                for (AbstractDamageablePart part : this) {
+                    float floatResult = (float)part.initialMaxHealth * globalFactor;
+                    expectedNewMaxHealth += floatResult;
+                    int result = (int)floatResult;
+                    if (result % 2 == 1) {
+                        int partMaxHealth = part.getMaxHealth();
+                        if (part.currentHealth < (float)partMaxHealth && reduced < 4) {
+                            --result;
+                            ++reduced;
+                        } else if (part.currentHealth > (float)partMaxHealth && added < 4) {
+                            ++result;
+                            ++added;
+                        } else if (reduced > added) {
+                            ++result;
+                            ++added;
+                        } else {
+                            --result;
+                            ++reduced;
+                        }
+                    }
+                    newMaxHealth += result;
+                    if (FirstAidConfig.GENERAL.debug.get().booleanValue()) {
+                        FirstAid.LOGGER.info("Part {} max health: {} initial; {} old; {} new", (Object)part.part.name(), (Object)part.initialMaxHealth, (Object)part.getMaxHealth(), (Object)result);
+                    }
+                    part.setMaxHealth(result);
+                }
+                if (Math.abs(expectedNewMaxHealth - (float)newMaxHealth) >= 2.0f) {
+                    if (FirstAidConfig.GENERAL.debug.get().booleanValue()) {
+                        FirstAid.LOGGER.info("Entering second stage - diff {}", (Object)Float.valueOf(Math.abs(expectedNewMaxHealth - (float)newMaxHealth)));
+                    }
+                    ArrayList<AbstractDamageablePart> prioList = new ArrayList<AbstractDamageablePart>();
+                    for (AbstractDamageablePart part : this) {
+                        prioList.add(part);
+                    }
+                    prioList.sort(Comparator.comparingInt(AbstractDamageablePart::getMaxHealth));
+                    for (AbstractDamageablePart part : prioList) {
+                        int maxHealth = part.getMaxHealth();
+                        if (FirstAidConfig.GENERAL.debug.get().booleanValue()) {
+                            FirstAid.LOGGER.info("Part {}: Second stage with total diff {}", (Object)part.part.name(), (Object)Float.valueOf(Math.abs(expectedNewMaxHealth - (float)newMaxHealth)));
+                        }
+                        if (expectedNewMaxHealth > (float)newMaxHealth) {
+                            part.setMaxHealth(maxHealth + 2);
+                            newMaxHealth += part.getMaxHealth() - maxHealth;
+                        } else if (expectedNewMaxHealth < (float)newMaxHealth) {
+                            part.setMaxHealth(maxHealth - 2);
+                            newMaxHealth -= maxHealth - part.getMaxHealth();
+                        }
+                        if (!(Math.abs(expectedNewMaxHealth - (float)newMaxHealth) < 2.0f)) continue;
+                    }
+                }
+            }
+            this.prevScaleFactor = globalFactor;
+        }
+    }
+
+    @Override
+    public void scheduleResync() {
+        if (this.resyncTimer == -1 || this.resyncTimer > 3) {
+            this.resyncTimer = 3;
+        }
+    }
+
+    @Override
+    public boolean hasNoCritical() {
+        return this.noCritical;
+    }
+
+    private boolean isPainSuppressed(Player player) {
+        return this.morphineTicksLeft > 0 || player.hasEffect(RegistryObjects.MORPHINE_EFFECT) || player.hasEffect(RegistryObjects.PAINKILLER_EFFECT);
+    }
+
+    private boolean isMorphineActive(Player player) {
+        return this.morphineTicksLeft > 0 || player.hasEffect(RegistryObjects.MORPHINE_EFFECT);
+    }
+
+    /**
+     * True while morphine is active or still in activation delay.
+     * Blocks withdrawal episodes and addiction debuff icons so treatment does not look like a drug crash.
+     */
+    private boolean isUnderOpioidCover(Player player) {
+        return this.isMorphineActive(player) || this.pendingMorphineDelayTicks > 0;
+    }
+
+    private void tickPendingMedicineActivations(Player player) {
+        boolean changed = false;
+        if (this.pendingPainkillerTicks > 0) {
+            --this.pendingPainkillerTicks;
+            if (this.pendingPainkillerTicks == 0) {
+                player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, PlayerDamageModel.getPainkillerDuration(), 0, false, false));
+                changed = true;
+            }
+        }
+        if (this.pendingMorphineDelayTicks > 0) {
+            --this.pendingMorphineDelayTicks;
+            if (this.pendingMorphineDelayTicks == 0 && this.pendingMorphineEffectTicks > 0) {
+                int duration = this.pendingMorphineEffectTicks;
+                boolean medicalUse = this.pendingMorphineMedicalUse;
+                this.pendingMorphineEffectTicks = 0;
+                this.pendingMorphineMedicalUse = false;
+                this.applyOralMorphineEffects(player, duration, medicalUse);
+                changed = true;
+            }
+        }
+        if (changed) {
+            this.scheduleResync();
+        }
+    }
+
+    private void updateMedicalState(Player player) {
+        boolean previousUnconsciousState = this.isUnconscious();
+        int previousPainLevel = this.painLevel;
+        int previousAdrenalineLevel = this.adrenalineLevel;
+        int previousAdrenalineTicks = this.adrenalineTicks;
+        float previousSuppressionIntensity = this.suppressionIntensity;
+        int previousSuppressionHoldTicks = this.suppressionHoldTicks;
+        int previousUnconsciousTicks = this.unconsciousTicks;
+        boolean previousCriticalCondition = this.criticalConditionActive;
+        boolean previousGiveUpState = this.unconsciousAllowsGiveUp;
+        boolean previousDeathState = this.unconsciousCausesDeath;
+        String previousUnconsciousReasonKey = this.unconsciousReasonKey;
+        if (this.resolveExternalReviveState(player)) {
+            return;
+        }
+        this.painLevel = this.calculatePainLevel();
+        this.tickAddictionState(player);
+        if (this.isWithdrawalEpisodeActive()) {
+            this.painLevel = Math.max(this.painLevel, this.getAddictionPainLevel());
+        }
+        this.tickSuppressionState();
+        if (this.criticalConditionActive && !this.hasCriticalPartCollapsed()) {
+            this.criticalConditionActive = false;
+            if (this.unconsciousCausesDeath) {
+                this.unconsciousAllowsGiveUp = false;
+                this.unconsciousCausesDeath = false;
+                if (this.unconsciousReasonKey.equals(UNCONSCIOUS_REASON_CRITICAL)) {
+                    this.unconsciousReasonKey = UNCONSCIOUS_REASON_RECOVERING;
+                    this.refreshRescueWakeUpState(player);
+                }
+            }
+        }
+        if (this.unconsciousTicks > 0) {
+            --this.unconsciousTicks;
+        }
+        if (this.criticalConditionActive && this.unconsciousTicks <= 0 && this.unconsciousCausesDeath) {
+            this.resetRecoveredPlayerState(player);
+            CommonUtils.killPlayerDirectly(player, null);
+            return;
+        }
+        if (this.unconsciousTicks <= 0) {
+            this.clearUnconsciousState();
+        }
+        if (previousPainLevel != this.painLevel || previousAdrenalineLevel != this.adrenalineLevel || previousAdrenalineTicks != this.adrenalineTicks || Float.compare(previousSuppressionIntensity, this.suppressionIntensity) != 0 || previousSuppressionHoldTicks != this.suppressionHoldTicks || previousUnconsciousTicks != this.unconsciousTicks || previousCriticalCondition != this.criticalConditionActive || previousGiveUpState != this.unconsciousAllowsGiveUp || previousDeathState != this.unconsciousCausesDeath || !Objects.equals(previousUnconsciousReasonKey, this.unconsciousReasonKey)) {
+            this.scheduleResync();
+        }
+        if (this.painLevel == 0 && this.adrenalineTicks == 0 && this.unconsciousTicks == 0 && !this.isPainSuppressed(player)) {
+            this.unconsciousAllowsGiveUp = false;
+            this.unconsciousCausesDeath = false;
+            this.unconsciousReasonKey = UNCONSCIOUS_REASON_NONE;
+        }
+        if (this.collapseAnimationTicks > 0) {
+            --this.collapseAnimationTicks;
+        }
+        if (previousUnconsciousState != this.isUnconscious()) {
+            if (this.isUnconscious()) {
+                this.collapseAnimationTicks = 12;
+                this.collapsePlacementPending = true;
+                player.refreshDimensions();
+            } else {
+                this.collapseAnimationTicks = 0;
+                this.collapsePlacementPending = false;
+                this.resetRecoveredPlayerState(player);
+            }
+        }
+    }
+
+    private boolean resolveExternalReviveState(Player player) {
+        if (!this.externalRevivePending || PRCompatManager.getHandler().isBleeding(player)) {
+            return false;
+        }
+        this.externalRevivePending = false;
+        if (player.isAlive() && player.getHealth() > 0.0f) {
+            this.revivePlayer(player);
+        } else {
+            this.clearStatusEffects();
+            this.resetRecoveredPlayerState(player);
+            this.scheduleResync();
+            if (!player.level().isClientSide() && player instanceof ServerPlayer) {
+                ServerPlayer serverPlayer = (ServerPlayer)player;
+                FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
+            }
+        }
+        return true;
+    }
+
+    private int calculatePainLevel() {
+        boolean hasInjury = false;
+        int fullyLostParts = 0;
+        float maxSeverity = 0.0f;
+        float weightedSeverity = 0.0f;
+        float totalWeight = 0.0f;
+        for (AbstractDamageablePart part : this) {
+            float visualHealth = CommonUtils.getVisualHealth(part);
+            float missingHealth = CommonUtils.getVisibleMissingHealth(part);
+            if (missingHealth <= 0.0f) continue;
             hasInjury = true;
-            float injuryRatio = missingHealth / part.getMaxHealth();
-            if (visualHealth <= 0.0F) {
-               fullyLostParts++;
-               injuryRatio = part.canCauseDeath ? 1.0F : 0.85F;
+            float injuryRatio = missingHealth / (float)part.getMaxHealth();
+            if (visualHealth <= 0.0f) {
+                ++fullyLostParts;
+                injuryRatio = part.canCauseDeath ? 1.0f : 0.85f;
+                float f = injuryRatio;
             }
-
-            if (part.canCauseDeath && injuryRatio >= 0.55F) {
-               injuryRatio = Math.min(1.0F, injuryRatio + 0.15F);
+            if (part.canCauseDeath && injuryRatio >= 0.55f) {
+                injuryRatio = Math.min(1.0f, injuryRatio + 0.15f);
             }
-
-            float weight = part.canCauseDeath ? 1.35F : 1.0F;
+            float weight = part.canCauseDeath ? 1.35f : 1.0f;
             maxSeverity = Math.max(maxSeverity, injuryRatio);
             weightedSeverity += injuryRatio * weight;
             totalWeight += weight;
-         }
-      }
+        }
+        if (!hasInjury) {
+            return 0;
+        }
+        // Always scale by injury severity (static "always mild" mode was confusing in practice).
+        float averageSeverity = totalWeight <= 0.0f ? 0.0f : weightedSeverity / totalWeight;
+        float combinedSeverity = Math.min(1.0f, maxSeverity * 0.65f + averageSeverity * 0.35f);
+        int painLevel = Math.max(1, Math.min(5, 1 + (int)Math.floor(combinedSeverity * 4.9999f)));
+        return fullyLostParts < 3 && painLevel >= 5 ? 4 : painLevel;
+    }
 
-      if (!hasInjury) {
-         return 0;
-      } else if (!FirstAid.dynamicPainEnabled) {
-         return Mth.clamp(FirstAid.mildPainLevel, 1, MAX_PAIN_LEVEL);
-      } else {
-         float averageSeverity = totalWeight <= 0.0F ? 0.0F : weightedSeverity / totalWeight;
-         float combinedSeverity = Math.min(1.0F, maxSeverity * 0.65F + averageSeverity * 0.35F);
-         int painLevel = Math.max(1, Math.min(5, 1 + (int)Math.floor(combinedSeverity * 4.9999F)));
-         return fullyLostParts < 3 && painLevel >= 5 ? 4 : painLevel;
-      }
-   }
+    private int calculateAdrenalineLevel(int ticks) {
+        if (ticks >= 140) {
+            return 3;
+        }
+        if (ticks >= 70) {
+            return 2;
+        }
+        return ticks >= 20 ? 1 : 0;
+    }
 
-   private int calculateAdrenalineLevel(int ticks) {
-      if (ticks >= 140) {
-         return 3;
-      } else if (ticks >= 70) {
-         return 2;
-      } else {
-         return ticks >= 20 ? 1 : 0;
-      }
-   }
-
-   private void tickSuppressionState() {
-      if (this.suppressionHoldTicks > 0) {
-         this.suppressionHoldTicks--;
-         this.suppressionDecayTicker = 0;
-      } else if (this.suppressionIntensity > 0.0F) {
-         this.suppressionDecayTicker++;
-         if (this.suppressionDecayTicker >= 4) {
+    private void tickSuppressionState() {
+        if (this.suppressionHoldTicks > FORCE_MAX_SUPPRESSION_HOLD_TICKS) {
+            this.suppressionHoldTicks = FORCE_MAX_SUPPRESSION_HOLD_TICKS;
+        }
+        if (this.suppressionHoldTicks > 0) {
+            --this.suppressionHoldTicks;
             this.suppressionDecayTicker = 0;
-            this.suppressionIntensity = Math.max(0.0F, this.suppressionIntensity - 0.03F);
-         }
-      } else {
-         this.suppressionDecayTicker = 0;
-      }
+        } else if (this.suppressionIntensity > 0.0f) {
+            ++this.suppressionDecayTicker;
+            if (this.suppressionDecayTicker >= 4) {
+                this.suppressionDecayTicker = 0;
+                this.suppressionIntensity = Math.max(0.0f, this.suppressionIntensity - 0.015f);
+            }
+        } else {
+            this.suppressionDecayTicker = 0;
+        }
+        this.refreshSuppressionSnapshot();
+    }
 
-      this.refreshSuppressionSnapshot();
-   }
+    private void refreshSuppressionSnapshot() {
+        this.adrenalineTicks = Math.round(Mth.clamp((float)this.suppressionIntensity, (float)0.0f, (float)1.0f) * 200.0f);
+        this.adrenalineLevel = this.calculateAdrenalineLevel(this.adrenalineTicks);
+    }
 
-   private void refreshSuppressionSnapshot() {
-      this.adrenalineTicks = Math.round(Mth.clamp(this.suppressionIntensity, 0.0F, 1.0F) * 200.0F);
-      this.adrenalineLevel = this.calculateAdrenalineLevel(this.adrenalineTicks);
-   }
+    private void applyUnconsciousPenalties(Player player) {
+        player.setSprinting(false);
+        player.stopUsingItem();
+        this.updateUnconsciousAttributes(player, true);
+        // Fabric: pose is re-applied by PlayerPoseMixin each updatePlayerPose tick.
+        player.setPose(this.getUnconsciousPose(player));
+        if (!player.level().isClientSide() && this.collapsePlacementPending) {
+            this.collapsePlacementPending = false;
+            this.placePlayerForCollapse(player);
+        }
+    }
 
-   private void applyUnconsciousPenalties(Player player) {
-      player.setSprinting(false);
-      player.stopUsingItem();
-      player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 5, 0, false, false));
-      this.updateUnconsciousAttributes(player, true);
-      player.setPose(this.getUnconsciousPose(player));
-      if (this.collapsePlacementPending) {
-         this.collapsePlacementPending = false;
-         this.placePlayerForCollapse(player);
-      }
-   }
+    private void clearUnconsciousPenalties(Player player) {
+        this.updateUnconsciousAttributes(player, false);
+        if (player.getPose() == Pose.SWIMMING || player.getPose() == Pose.CROUCHING) {
+            player.setPose(Pose.STANDING);
+        }
+    }
 
-   private void clearUnconsciousPenalties(Player player) {
-      this.updateUnconsciousAttributes(player, false);
-      player.setPose(Pose.STANDING);
-   }
+    private void resetRecoveredPlayerState(Player player) {
+        this.clearUnconsciousPenalties(player);
+        player.setShiftKeyDown(false);
+        player.refreshDimensions();
+    }
 
-   private void resetRecoveredPlayerState(Player player) {
-      this.clearUnconsciousPenalties(player);
-      player.setShiftKeyDown(false);
-      player.refreshDimensions();
-   }
-
-   @Nullable
-   private AbstractDamageablePart getFirstCriticalRescueTarget() {
-      for (AbstractDamageablePart part : this) {
-         if (part.canCauseDeath && part.currentHealth > 0.0F) {
+    @Nullable
+    private AbstractDamageablePart getFirstCriticalRescueTarget() {
+        for (AbstractDamageablePart part : this) {
+            if (!part.canCauseDeath || !(part.currentHealth > 0.0f)) continue;
             return part;
-         }
-      }
+        }
+        return null;
+    }
 
-      return null;
-   }
-
-   private void rescueCriticalParts(float restoredHealth) {
-      for (AbstractDamageablePart part : this) {
-         if (part.canCauseDeath && part.currentHealth <= 0.0F) {
+    private void rescueCriticalParts(float restoredHealth) {
+        for (AbstractDamageablePart part : this) {
+            if (!part.canCauseDeath || !(part.currentHealth <= 0.0f)) continue;
             part.currentHealth = Math.min((float)part.getMaxHealth(), restoredHealth);
-         }
-      }
-   }
+        }
+    }
 
-   private void rescueNonCriticalZeroParts(float restoredHealth) {
-      for (AbstractDamageablePart part : this) {
-         if (!part.canCauseDeath && part.currentHealth <= 0.0F) {
+    private void rescueNonCriticalZeroParts(float restoredHealth) {
+        for (AbstractDamageablePart part : this) {
+            if (part.canCauseDeath || !(part.currentHealth <= 0.0f)) continue;
             part.currentHealth = Math.min((float)part.getMaxHealth(), restoredHealth);
-         }
-      }
-   }
+        }
+    }
 
-   private void restoreDamagedCriticalParts(float restoredHealth) {
-      for (AbstractDamageablePart part : this) {
-         if (part.canCauseDeath && part.currentHealth < (float)part.getMaxHealth()) {
+    private void restoreDamagedCriticalParts(float restoredHealth) {
+        for (AbstractDamageablePart part : this) {
+            if (!part.canCauseDeath || !(part.currentHealth < (float)part.getMaxHealth())) continue;
             part.currentHealth = Math.min((float)part.getMaxHealth(), part.currentHealth + restoredHealth);
-         }
-      }
-   }
+        }
+    }
 
-   private boolean hasCriticalPartCollapsed() {
-      for (AbstractDamageablePart part : this) {
-         if (part.canCauseDeath && part.currentHealth <= 0.0F) {
+    private boolean hasCriticalPartCollapsed() {
+        for (AbstractDamageablePart part : this) {
+            if (!part.canCauseDeath || !(part.currentHealth <= 0.0f)) continue;
             return true;
-         }
-      }
+        }
+        return false;
+    }
 
-      return false;
-   }
-
-   private boolean hasAllCriticalPartsCollapsed() {
-      boolean hasCriticalPart = false;
-
-      for (AbstractDamageablePart part : this) {
-         if (part.canCauseDeath) {
+    private boolean hasAllCriticalPartsCollapsed() {
+        boolean hasCriticalPart = false;
+        for (AbstractDamageablePart part : this) {
+            if (!part.canCauseDeath) continue;
             hasCriticalPart = true;
-            if (part.currentHealth > 0.0F) {
-               return false;
-            }
-         }
-      }
-
-      return hasCriticalPart;
-   }
-
-   private boolean hasNoRemainingBodyHealth() {
-      for (AbstractDamageablePart part : this) {
-         if (part.currentHealth > 0.0F) {
+            if (!(part.currentHealth > 0.0f)) continue;
             return false;
-         }
-      }
+        }
+        return hasCriticalPart;
+    }
 
-      return true;
-   }
+    private boolean hasNoRemainingBodyHealth() {
+        for (AbstractDamageablePart part : this) {
+            if (!(part.currentHealth > 0.0f)) continue;
+            return false;
+        }
+        return true;
+    }
 
-   private void setUnconsciousState(int ticks, boolean allowsGiveUp, boolean causesDeath, String reasonKey) {
-      this.unconsciousTicks = ticks;
-      this.unconsciousAllowsGiveUp = allowsGiveUp;
-      this.unconsciousCausesDeath = causesDeath;
-      this.unconsciousReasonKey = reasonKey;
-   }
+    private void setUnconsciousState(int ticks, boolean allowsGiveUp, boolean causesDeath, String reasonKey) {
+        this.unconsciousTicks = ticks;
+        this.unconsciousMaxTicks = Math.max(1, ticks);
+        this.unconsciousAllowsGiveUp = allowsGiveUp;
+        this.unconsciousCausesDeath = causesDeath;
+        this.unconsciousReasonKey = reasonKey;
+    }
 
-   private boolean isRescueWakeUpRecoveryActive() {
-      return this.isUnconscious() && !this.criticalConditionActive && UNCONSCIOUS_REASON_RECOVERING.equals(this.unconsciousReasonKey);
-   }
+    private boolean isRescueWakeUpRecoveryActive() {
+        return this.isUnconscious() && !this.criticalConditionActive && UNCONSCIOUS_REASON_RECOVERING.equals(this.unconsciousReasonKey);
+    }
 
-   private void clearUnconsciousState() {
-      this.unconsciousTicks = 0;
-      this.unconsciousAllowsGiveUp = false;
-      this.unconsciousCausesDeath = false;
-      this.unconsciousReasonKey = "";
-      this.collapseAnimationTicks = 0;
-      this.collapsePlacementPending = false;
-   }
+    private void clearUnconsciousState() {
+        this.unconsciousTicks = 0;
+        this.unconsciousMaxTicks = 0;
+        this.unconsciousAllowsGiveUp = false;
+        this.unconsciousCausesDeath = false;
+        this.unconsciousReasonKey = UNCONSCIOUS_REASON_NONE;
+        this.collapseAnimationTicks = 0;
+        this.collapsePlacementPending = false;
+    }
 
-   private void placePlayerForCollapse(Player player) {
-      Vec3 origin = player.position();
-      Vec3 adjustedOrigin = this.getRaisedCollapseOrigin(player, origin);
-      Vec3 target = this.findCollapsePlacement(player, adjustedOrigin);
-      if (target == null && !adjustedOrigin.equals(origin)) {
-         target = this.findCollapsePlacement(player, origin);
-      }
+    public boolean canCrawlWhileDowned() {
+        if (!FirstAidConfig.SERVER.criticalCrawlEnabled.get().booleanValue() || !this.isCriticalDowned() || this.unconsciousMaxTicks <= 0) {
+            return false;
+        }
+        float remainingRatio = (float)this.unconsciousTicks / (float)this.unconsciousMaxTicks;
+        return remainingRatio > 0.39999998f;
+    }
 
-      if (target != null) {
-         player.setPos(target.x, target.y, target.z);
-      }
-   }
+    public float getCrawlSpeedFactor() {
+        return this.canCrawlWhileDowned() ? CRAWL_SPEED_FACTOR : 0.0f;
+    }
 
-   public static EntityDimensions getUnconsciousDimensions(boolean cramped) {
-      return cramped ? CRAMPED_UNCONSCIOUS_DIMENSIONS : UNCONSCIOUS_DIMENSIONS;
-   }
+    public float getAddictionValue() {
+        return this.addictionValue;
+    }
 
-   public boolean shouldUseCrampedUnconsciousDimensions(Player player) {
-      return this.isUnconscious() && !this.canOccupySpace(player, player.position(), UNCONSCIOUS_DIMENSIONS, false);
-   }
+    public void setAddictionValue(float value) {
+        this.addictionValue = Mth.clamp((float)value, (float)0.0f, (float)100.0f);
+        this.scheduleResync();
+    }
 
-   private Vec3 getRaisedCollapseOrigin(Player player, Vec3 origin) {
-      if (this.canOccupyCollapseSpace(player, origin, false)) {
-         return origin;
-      } else {
-         Vec3 raisedOrigin = origin.add(0.0, 1.0, 0.0);
-         return this.canOccupyCollapseSpace(player, raisedOrigin, true) ? raisedOrigin : origin;
-      }
-   }
+    public float getAddictionNormalized() {
+        return Mth.clamp((float)(this.addictionValue / 100.0f), (float)0.0f, (float)1.0f);
+    }
 
-   private Vec3 findCollapsePlacement(Player player, Vec3 origin) {
-      Vec3 bestTarget = null;
-      double bestDistance = Double.MAX_VALUE;
-      int bestManhattan = Integer.MAX_VALUE;
+    public int getWithdrawalEpisodeType() {
+        return this.withdrawalEpisodeType;
+    }
 
-      for (int dz = -2; dz <= 2; dz++) {
-         for (int dx = -2; dx <= 2; dx++) {
-            Vec3 candidate = origin.add(dx, 0.0, dz);
-            if (this.canOccupyCollapseSpace(player, candidate, true)) {
-               double distance = dx * dx + dz * dz;
-               int manhattan = Math.abs(dx) + Math.abs(dz);
-               if (distance < bestDistance
-                  || distance == bestDistance && manhattan < bestManhattan
-                  || distance == bestDistance && manhattan == bestManhattan && this.isDeterministicallyEarlier(candidate, bestTarget)) {
-                  bestTarget = candidate;
-                  bestDistance = distance;
-                  bestManhattan = manhattan;
-               }
+    public int getWithdrawalEpisodeTicksLeft() {
+        return this.withdrawalEpisodeTicksLeft;
+    }
+
+    public int getAddictionPulseType() {
+        return this.addictionPulseTicks > 0 ? this.addictionPulseType : 0;
+    }
+
+    public boolean isUnexplainedPainEpisodeActive() {
+        return this.isWithdrawalEpisodeActive();
+    }
+
+    public boolean isWithdrawalEpisodeActive() {
+        return this.withdrawalEpisodeTicksLeft > 0 && this.withdrawalEpisodeType != 0;
+    }
+
+    public boolean hasWithdrawalFlag(int flag) {
+        return (this.withdrawalEpisodeType & flag) != 0;
+    }
+
+    private boolean isMedicalOpioidUse() {
+        if (this.painLevel > 0) {
+            return true;
+        }
+        for (AbstractDamageablePart part : this) {
+            if (!(CommonUtils.getVisibleMissingHealth(part) > 0.0f)) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private void registerOpioidUse(Player player, boolean injection, boolean medicalUse) {
+        if (!FirstAidConfig.SERVER.addictionEnabled.get().booleanValue()) {
+            return;
+        }
+        float base = injection ? 16.0f : 6.0f;
+        float mult = medicalUse ? 0.55f : 1.35f;
+        float gain = base * mult;
+        this.addictionValue = Mth.clamp((float)(this.addictionValue + gain), (float)0.0f, (float)100.0f);
+        this.ticksSinceLastOpioid = 0;
+        if (this.withdrawalEpisodeTicksLeft > 0) {
+            this.clearWithdrawalEpisode(player);
+        }
+        // Addiction value still rises, but do not attach harmful "addiction rising" icons
+        // while the player is under morphine / activation delay (that looked like a drug debuff).
+        if (this.isUnderOpioidCover(player)) {
+            this.clearAddictionPulseEffects(player);
+        } else {
+            this.addictionPulseType = injection || !medicalUse || gain >= 12.0f ? 2 : 1;
+            this.addictionPulseTicks = 100;
+        }
+        this.scheduleResync();
+    }
+
+    private void tickAddictionState(Player player) {
+        if (this.addictionPulseTicks > 0) {
+            --this.addictionPulseTicks;
+            if (this.addictionPulseTicks == 0) {
+                this.addictionPulseType = 0;
             }
-         }
-      }
-
-      return bestTarget;
-   }
-
-   private boolean canOccupyCollapseSpace(Player player, Vec3 position, boolean requireSupport) {
-      return this.canOccupySpace(player, position, UNCONSCIOUS_DIMENSIONS, requireSupport);
-   }
-
-   private boolean canOccupySpace(Player player, Vec3 position, EntityDimensions dimensions, boolean requireSupport) {
-      AABB boundingBox = dimensions.makeBoundingBox(position.x, position.y, position.z);
-      return !player.level().noCollision(player, boundingBox) ? false : !requireSupport || this.hasCollapseSupport(player, boundingBox);
-   }
-
-   private boolean hasCollapseSupport(Player player, AABB boundingBox) {
-      return !player.level().noCollision(player, boundingBox.move(0.0, -0.125, 0.0));
-   }
-
-   private boolean isDeterministicallyEarlier(Vec3 candidate, Vec3 currentBest) {
-      if (currentBest == null) {
-         return true;
-      } else {
-         return candidate.z != currentBest.z ? candidate.z < currentBest.z : candidate.x < currentBest.x;
-      }
-   }
-
-   private Pose getUnconsciousPose(Player player) {
-      return this.shouldUseCrampedUnconsciousDimensions(player) ? Pose.CROUCHING : Pose.SWIMMING;
-   }
-
-   private void updateUnconsciousAttributes(Player player, boolean unconscious) {
-      AttributeMap attributeMap = player.getAttributes();
-      this.updateUnconsciousModifier(attributeMap, Attributes.MOVEMENT_SPEED, unconscious);
-      this.updateUnconsciousModifier(attributeMap, Attributes.JUMP_STRENGTH, unconscious);
-      this.updateUnconsciousModifier(attributeMap, Attributes.ATTACK_SPEED, unconscious);
-      this.updateUnconsciousModifier(attributeMap, Attributes.BLOCK_BREAK_SPEED, unconscious);
-      this.updateUnconsciousModifier(attributeMap, Attributes.BLOCK_INTERACTION_RANGE, unconscious);
-   }
-
-   private void updateUnconsciousModifier(AttributeMap map, Holder<Attribute> attribute, boolean unconscious) {
-      AttributeInstance instance = map.getInstance(attribute);
-      if (instance != null) {
-         if (unconscious) {
-            if (!instance.hasModifier(ATTR_UNCONSCIOUS)) {
-               instance.addTransientModifier(new AttributeModifier(ATTR_UNCONSCIOUS, -1.0, Operation.ADD_MULTIPLIED_TOTAL));
+        }
+        if (!FirstAidConfig.SERVER.addictionEnabled.get().booleanValue()) {
+            if (this.withdrawalEpisodeTicksLeft > 0) {
+                this.clearWithdrawalEpisode(player);
             }
-         } else if (instance.hasModifier(ATTR_UNCONSCIOUS)) {
+            this.syncAddictionVisualEffects(player);
+            return;
+        }
+        if (this.isUnderOpioidCover(player)) {
+            this.ticksSinceLastOpioid = 0;
+            if (this.withdrawalEpisodeTicksLeft > 0) {
+                this.clearWithdrawalEpisode(player);
+            }
+            // Keep treatment clean: no addiction gain/withdrawal icons on top of morphine.
+            this.clearAddictionPulseEffects(player);
+            return;
+        }
+        ++this.ticksSinceLastOpioid;
+        if (this.addictionValue > 0.0f && this.ticksSinceLastOpioid > 2400 && this.ticksSinceLastOpioid % 20 == 0) {
+            float previous = this.addictionValue;
+            float decay = this.addictionValue < 30.0f ? 0.015f : 0.06f;
+            this.addictionValue = Math.max(0.0f, this.addictionValue - decay);
+            if (this.addictionValue < previous) {
+                this.addictionPulseType = 3;
+                this.addictionPulseTicks = 160;
+                this.scheduleResync();
+            }
+        }
+        if (this.withdrawalEpisodeTicksLeft > 0) {
+            --this.withdrawalEpisodeTicksLeft;
+            this.applyWithdrawalEpisodeEffects(player);
+            if (this.withdrawalEpisodeTicksLeft <= 0) {
+                this.withdrawalEpisodeType = 0;
+                this.withdrawalCooldownTicks = this.getEpisodeCooldownTicks(this.getAddictionNormalized());
+                this.scheduleResync();
+            }
+            this.syncAddictionVisualEffects(player);
+            return;
+        }
+        if (this.withdrawalCooldownTicks > 0) {
+            --this.withdrawalCooldownTicks;
+            this.syncAddictionVisualEffects(player);
+            return;
+        }
+        float normalized = this.getAddictionNormalized();
+        if (normalized < 0.25f) {
+            this.withdrawalCheckTicks = 0;
+            this.syncAddictionVisualEffects(player);
+            return;
+        }
+        if (this.withdrawalCheckTicks > 0) {
+            --this.withdrawalCheckTicks;
+            this.syncAddictionVisualEffects(player);
+            return;
+        }
+        float chance = this.getEpisodeChance(normalized);
+        this.withdrawalCheckTicks = this.getEpisodeCheckInterval(normalized);
+        if (EventHandler.RAND.nextFloat() > chance) {
+            this.syncAddictionVisualEffects(player);
+            return;
+        }
+        this.startWithdrawalEpisode(player, normalized);
+        this.syncAddictionVisualEffects(player);
+    }
+
+    private int getEpisodeCheckInterval(float normalized) {
+        float t = Mth.clamp((float)((normalized - 0.25f) / 0.75f), (float)0.0f, (float)1.0f);
+        float curved = t * t;
+        return Math.round(Mth.lerp((float)curved, (float)280.0f, (float)60.0f));
+    }
+
+    private int getEpisodeCooldownTicks(float normalized) {
+        float t = Mth.clamp((float)((normalized - 0.25f) / 0.75f), (float)0.0f, (float)1.0f);
+        return Math.round(Mth.lerp((float)(t * t), (float)440.0f, (float)160.0f));
+    }
+
+    private float getEpisodeChance(float normalized) {
+        float t = Mth.clamp((float)normalized, (float)0.0f, (float)1.0f);
+        return Mth.clamp((float)(0.05f + t * t * 0.8f), (float)0.0f, (float)0.88f);
+    }
+
+    private void syncAddictionVisualEffects(Player player) {
+        if (player.level().isClientSide()) {
+            return;
+        }
+        if (this.addictionPulseTicks > 0) {
+            Holder<MobEffect> pulseEffect = switch (this.addictionPulseType) {
+                case 1 -> RegistryObjects.ADDICTION_INCREASE_EFFECT;
+                case 2 -> RegistryObjects.ADDICTION_ULTRA_INCREASE_EFFECT;
+                case 3 -> RegistryObjects.ADDICTION_DECREASE_EFFECT;
+                default -> null;
+            };
+            if (pulseEffect != null) {
+                MilkImmuneMobEffectInstance.ensure((LivingEntity)player, pulseEffect, this.addictionPulseTicks);
+            }
+            if (this.addictionPulseType != 1) {
+                player.removeEffect(RegistryObjects.ADDICTION_INCREASE_EFFECT);
+            }
+            if (this.addictionPulseType != 2) {
+                player.removeEffect(RegistryObjects.ADDICTION_ULTRA_INCREASE_EFFECT);
+            }
+            if (this.addictionPulseType != 3) {
+                player.removeEffect(RegistryObjects.ADDICTION_DECREASE_EFFECT);
+            }
+        } else {
+            player.removeEffect(RegistryObjects.ADDICTION_INCREASE_EFFECT);
+            player.removeEffect(RegistryObjects.ADDICTION_ULTRA_INCREASE_EFFECT);
+            player.removeEffect(RegistryObjects.ADDICTION_DECREASE_EFFECT);
+        }
+        if (this.isWithdrawalEpisodeActive()) {
+            MilkImmuneMobEffectInstance.ensure((LivingEntity)player, RegistryObjects.ADDICTION_WITHDRAWAL_EFFECT, this.withdrawalEpisodeTicksLeft);
+            this.applyWithdrawalEpisodeEffects(player);
+        } else {
+            player.removeEffect(RegistryObjects.ADDICTION_WITHDRAWAL_EFFECT);
+        }
+    }
+
+    private void startWithdrawalEpisode(Player player, float normalized) {
+        int flags = this.rollWithdrawalEpisodeFlags(normalized);
+        float durationSeconds = Mth.lerp((float)normalized, (float)28.0f, (float)110.0f);
+        int durationTicks = Math.max(240, Math.round((durationSeconds *= 0.88f + EventHandler.RAND.nextFloat() * 0.24f) * 20.0f));
+        this.withdrawalEpisodeType = flags;
+        this.withdrawalEpisodeTicksLeft = durationTicks;
+        this.applyWithdrawalEpisodeEffects(player);
+        this.scheduleResync();
+    }
+
+    private int rollWithdrawalEpisodeFlags(float normalized) {
+        int i;
+        int flags = 1;
+        int extraCount = this.rollExtraSymptomCount(normalized);
+        int[] pool = new int[]{2, 4, 8, 16};
+        for (i = pool.length - 1; i > 0; --i) {
+            int j = EventHandler.RAND.nextInt(i + 1);
+            int tmp = pool[i];
+            pool[i] = pool[j];
+            pool[j] = tmp;
+        }
+        for (i = 0; i < extraCount && i < pool.length; ++i) {
+            flags |= pool[i];
+        }
+        return flags;
+    }
+
+    private int rollExtraSymptomCount(float normalized) {
+        if (normalized < 0.5f) {
+            float mildProgress = Mth.clamp((float)((normalized - 0.25f) / 0.25f), (float)0.0f, (float)1.0f);
+            return EventHandler.RAND.nextFloat() < 0.25f + mildProgress * 0.55f ? 1 : 0;
+        }
+        if (normalized < 0.75f) {
+            float midProgress = Mth.clamp((float)((normalized - 0.5f) / 0.25f), (float)0.0f, (float)1.0f);
+            return EventHandler.RAND.nextFloat() < 0.45f + midProgress * 0.4f ? 2 : 1;
+        }
+        float severeProgress = Mth.clamp((float)((normalized - 0.75f) / 0.25f), (float)0.0f, (float)1.0f);
+        int count = 2;
+        if (EventHandler.RAND.nextFloat() < 0.55f + severeProgress * 0.35f) {
+            ++count;
+        }
+        if (EventHandler.RAND.nextFloat() < severeProgress * 0.85f) {
+            ++count;
+        }
+        return Math.min(4, count);
+    }
+
+    private int getAddictionPainLevel() {
+        float normalized = this.getAddictionNormalized();
+        if (normalized < 0.25f) {
+            return 0;
+        }
+        if (normalized < 0.5f) {
+            return normalized < 0.375f ? 1 : 2;
+        }
+        if (normalized < 0.75f) {
+            return normalized < 0.625f ? 2 : 3;
+        }
+        if (normalized < 0.9f) {
+            return 4;
+        }
+        return 5;
+    }
+
+    private void applyWithdrawalEpisodeEffects(Player player) {
+        int amplifier;
+        int remaining = Math.max(2, this.withdrawalEpisodeTicksLeft);
+        MilkImmuneMobEffectInstance.ensure((LivingEntity)player, RegistryObjects.ADDICTION_WITHDRAWAL_EFFECT, remaining);
+        if (this.hasWithdrawalFlag(2)) {
+            MilkImmuneMobEffectInstance.ensure((LivingEntity)player, (Holder<MobEffect>)MobEffects.DARKNESS, remaining);
+        } else {
+            player.removeEffect(MobEffects.DARKNESS);
+        }
+        if (this.hasWithdrawalFlag(4)) {
+            MilkImmuneMobEffectInstance.ensure((LivingEntity)player, (Holder<MobEffect>)MobEffects.NAUSEA, remaining);
+        } else {
+            player.removeEffect(MobEffects.NAUSEA);
+        }
+        if (this.hasWithdrawalFlag(8)) {
+            amplifier = this.getAddictionNormalized() >= 0.75f ? 1 : 0;
+            MilkImmuneMobEffectInstance.ensure((LivingEntity)player, (Holder<MobEffect>)MobEffects.WEAKNESS, remaining, amplifier, true);
+        } else {
+            player.removeEffect(MobEffects.WEAKNESS);
+        }
+        if (this.hasWithdrawalFlag(16)) {
+            amplifier = this.getAddictionNormalized() >= 0.75f ? 1 : 0;
+            MilkImmuneMobEffectInstance.ensure((LivingEntity)player, (Holder<MobEffect>)MobEffects.SLOWNESS, remaining, amplifier, true);
+        } else {
+            player.removeEffect(MobEffects.SLOWNESS);
+        }
+    }
+
+    private void clearWithdrawalEpisode(Player player) {
+        this.withdrawalEpisodeType = 0;
+        this.withdrawalEpisodeTicksLeft = 0;
+        player.removeEffect(RegistryObjects.ADDICTION_WITHDRAWAL_EFFECT);
+        player.removeEffect(MobEffects.DARKNESS);
+        player.removeEffect(MobEffects.NAUSEA);
+        player.removeEffect(MobEffects.WEAKNESS);
+        player.removeEffect(MobEffects.SLOWNESS);
+        this.scheduleResync();
+    }
+
+
+    /** Removes addiction pulse icons without changing the addiction value itself. */
+    private void clearAddictionPulseEffects(Player player) {
+        this.addictionPulseType = 0;
+        this.addictionPulseTicks = 0;
+        if (player == null || player.level().isClientSide()) {
+            return;
+        }
+        player.removeEffect(RegistryObjects.ADDICTION_INCREASE_EFFECT);
+        player.removeEffect(RegistryObjects.ADDICTION_ULTRA_INCREASE_EFFECT);
+        player.removeEffect(RegistryObjects.ADDICTION_DECREASE_EFFECT);
+        player.removeEffect(RegistryObjects.ADDICTION_WITHDRAWAL_EFFECT);
+    }
+    private void placePlayerForCollapse(Player player) {
+        Vec3 origin = player.position();
+        Vec3 adjustedOrigin = this.getRaisedCollapseOrigin(player, origin);
+        Vec3 target = this.findCollapsePlacement(player, adjustedOrigin);
+        if (target == null && !adjustedOrigin.equals((Object)origin)) {
+            target = this.findCollapsePlacement(player, origin);
+        }
+        if (target != null) {
+            player.setPos(target.x, target.y, target.z);
+        }
+    }
+
+    public static EntityDimensions getUnconsciousDimensions(boolean cramped) {
+        return cramped ? CRAMPED_UNCONSCIOUS_DIMENSIONS : UNCONSCIOUS_DIMENSIONS;
+    }
+
+    public boolean shouldUseCrampedUnconsciousDimensions(Player player) {
+        return this.isUnconscious() && !this.canOccupySpace(player, player.position(), UNCONSCIOUS_DIMENSIONS, false);
+    }
+
+    private Vec3 getRaisedCollapseOrigin(Player player, Vec3 origin) {
+        if (this.canOccupyCollapseSpace(player, origin, false)) {
+            return origin;
+        }
+        Vec3 raisedOrigin = origin.add(0.0, 1.0, 0.0);
+        return this.canOccupyCollapseSpace(player, raisedOrigin, true) ? raisedOrigin : origin;
+    }
+
+    private Vec3 findCollapsePlacement(Player player, Vec3 origin) {
+        Vec3 bestTarget = null;
+        double bestDistance = Double.MAX_VALUE;
+        int bestManhattan = Integer.MAX_VALUE;
+        for (int dz = -2; dz <= 2; ++dz) {
+            for (int dx = -2; dx <= 2; ++dx) {
+                Vec3 candidate = origin.add((double)dx, 0.0, (double)dz);
+                if (!this.canOccupyCollapseSpace(player, candidate, true)) continue;
+                double distance = dx * dx + dz * dz;
+                int manhattan = Math.abs(dx) + Math.abs(dz);
+                if (!(distance < bestDistance || distance == bestDistance && manhattan < bestManhattan || distance == bestDistance && manhattan == bestManhattan && this.isDeterministicallyEarlier(candidate, bestTarget))) continue;
+                bestTarget = candidate;
+                bestDistance = distance;
+                bestManhattan = manhattan;
+            }
+        }
+        return bestTarget;
+    }
+
+    private boolean canOccupyCollapseSpace(Player player, Vec3 position, boolean requireSupport) {
+        return this.canOccupySpace(player, position, UNCONSCIOUS_DIMENSIONS, requireSupport);
+    }
+
+    private boolean canOccupySpace(Player player, Vec3 position, EntityDimensions dimensions, boolean requireSupport) {
+        AABB boundingBox = dimensions.makeBoundingBox(position.x, position.y, position.z);
+        return !player.level().noCollision((Entity)player, boundingBox) ? false : !requireSupport || this.hasCollapseSupport(player, boundingBox);
+    }
+
+    private boolean hasCollapseSupport(Player player, AABB boundingBox) {
+        return !player.level().noCollision((Entity)player, boundingBox.move(0.0, -0.125, 0.0));
+    }
+
+    private boolean isDeterministicallyEarlier(Vec3 candidate, Vec3 currentBest) {
+        if (currentBest == null) {
+            return true;
+        }
+        return candidate.z != currentBest.z ? candidate.z < currentBest.z : candidate.x < currentBest.x;
+    }
+
+    private Pose getUnconsciousPose(Player player) {
+        return this.shouldUseCrampedUnconsciousDimensions(player) ? Pose.CROUCHING : Pose.SWIMMING;
+    }
+
+    private void updateUnconsciousAttributes(Player player, boolean unconscious) {
+        AttributeMap attributeMap = player.getAttributes();
+        double moveAmount = unconscious ? (this.canCrawlWhileDowned() ? CRAWL_MOVE_ATTRIBUTE : -1.0) : 0.0;
+        this.updateUnconsciousModifier(attributeMap, (Holder<Attribute>)Attributes.MOVEMENT_SPEED, unconscious, moveAmount);
+        this.updateUnconsciousModifier(attributeMap, (Holder<Attribute>)Attributes.JUMP_STRENGTH, unconscious, -1.0);
+        this.updateUnconsciousModifier(attributeMap, (Holder<Attribute>)Attributes.ATTACK_SPEED, unconscious, -1.0);
+        this.updateUnconsciousModifier(attributeMap, (Holder<Attribute>)Attributes.BLOCK_BREAK_SPEED, unconscious, -1.0);
+        this.updateUnconsciousModifier(attributeMap, (Holder<Attribute>)Attributes.BLOCK_INTERACTION_RANGE, unconscious, -1.0);
+    }
+
+    private void updateUnconsciousModifier(AttributeMap map, Holder<Attribute> attribute, boolean unconscious, double amount) {
+        AttributeInstance instance = map.getInstance(attribute);
+        if (instance == null) {
+            return;
+        }
+        if (unconscious) {
+            AttributeModifier existing = instance.getModifier(ATTR_UNCONSCIOUS);
+            if (existing == null || Double.compare(existing.amount(), amount) != 0) {
+                instance.removeModifier(ATTR_UNCONSCIOUS);
+                instance.addTransientModifier(new AttributeModifier(ATTR_UNCONSCIOUS, amount, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+            }
+        } else if (instance.hasModifier(ATTR_UNCONSCIOUS)) {
             instance.removeModifier(ATTR_UNCONSCIOUS);
-         }
-      }
-   }
+        }
+    }
 }

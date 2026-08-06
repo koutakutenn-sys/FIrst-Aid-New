@@ -275,7 +275,7 @@ public final class EventHandler {
 
                   if (playerDamageModel.isUnconscious()) {
                      clearAttackTargetsAround(player, 24.0);
-                     restrictUnconsciousMovement(player);
+                     restrictUnconsciousMovement(player, playerDamageModel);
                   }
                }
 
@@ -447,6 +447,7 @@ public final class EventHandler {
       FirstAid.dynamicPainEnabled = false;
       FirstAid.mildPainLevel = 1;
       FirstAid.enablePainVignette = true;
+        FirstAid.enablePainBlur = true;
       FirstAid.enablePainFovCompression = true;
       FirstAid.enablePainAudioEffects = true;
       FirstAid.lowSuppressionEnabled = false;
@@ -553,13 +554,31 @@ public final class EventHandler {
 
    /**
     * Stops vanilla and ability-mod mobility while the player is downed.
-    * Clears sprint/jump impulse and kills horizontal/upward velocity so parkour dodges cannot relocate the body.
+    * During the critical crawl window, allows slow horizontal movement only.
     */
-   private static void restrictUnconsciousMovement(Player player) {
+   private static void restrictUnconsciousMovement(Player player, PlayerDamageModel playerDamageModel) {
       player.setSprinting(false);
       player.setJumping(false);
       Vec3 motion = player.getDeltaMovement();
       double y = Math.min(0.0D, motion.y);
+      if (playerDamageModel.canCrawlWhileDowned()) {
+         double maxHorizontal = 0.10D * playerDamageModel.getCrawlSpeedFactor() / 0.28D;
+         maxHorizontal = Math.max(0.06D, Math.min(0.12D, maxHorizontal));
+         double horizontal = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+         double nx = motion.x;
+         double nz = motion.z;
+         if (horizontal > maxHorizontal && horizontal > 0.0D) {
+            double scale = maxHorizontal / horizontal;
+            nx *= scale;
+            nz *= scale;
+         }
+         if (nx != motion.x || nz != motion.z || motion.y > 0.0D) {
+            player.setDeltaMovement(nx, y, nz);
+         }
+         player.yya = 0.0F;
+         player.hurtMarked = true;
+         return;
+      }
       if (motion.x != 0.0D || motion.z != 0.0D || motion.y > 0.0D) {
          player.setDeltaMovement(0.0D, y, 0.0D);
       }
@@ -617,7 +636,8 @@ public final class EventHandler {
                "firstaid.tip.commands.group.advanced",
                buildCommandTipChip("firstaid.tip.commands.injurydebuff.label", "firstaid.tip.commands.injurydebuff.detail", "/firstaid injurydebuff normal", ChatFormatting.GOLD),
                buildCommandTipChip("firstaid.tip.commands.randomdamage.label", "firstaid.tip.commands.randomdamage.detail", "/firstaid randomdamage friendly chance 80", ChatFormatting.GOLD),
-               buildCommandTipChip("firstaid.tip.commands.damagepart.label", "firstaid.tip.commands.damagepart.detail", "/damagePart HEAD 4", ChatFormatting.RED)
+               buildCommandTipChip("firstaid.tip.commands.addiction.label", "firstaid.tip.commands.addiction.detail", "/firstaid addiction set @s 0", ChatFormatting.LIGHT_PURPLE),
+                buildCommandTipChip("firstaid.tip.commands.damagepart.label", "firstaid.tip.commands.damagepart.detail", "/damagePart HEAD 4", ChatFormatting.RED)
             ),
             false
          );

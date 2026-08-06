@@ -1,19 +1,6 @@
 /*
  * FirstAid
  * Copyright (C) 2017-2024
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package ichttt.mods.firstaid.common.network;
@@ -35,6 +22,8 @@ public class MessageSyncCommandSettings implements CustomPacketPayload {
             ByteBufCodecs.BOOL,
             message -> message.enablePainVignette,
             ByteBufCodecs.BOOL,
+            message -> message.enablePainBlur,
+            ByteBufCodecs.BOOL,
             message -> message.enablePainFovCompression,
             ByteBufCodecs.BOOL,
             message -> message.enablePainAudioEffects,
@@ -45,13 +34,22 @@ public class MessageSyncCommandSettings implements CustomPacketPayload {
             MessageSyncCommandSettings::new);
 
     private final boolean enablePainVignette;
+    private final boolean enablePainBlur;
     private final boolean enablePainFovCompression;
     private final boolean enablePainAudioEffects;
     private final boolean projectileSuppressionEnabled;
     private final String suppressionEntityBlacklist;
 
-    private MessageSyncCommandSettings(boolean enablePainVignette, boolean enablePainFovCompression, boolean enablePainAudioEffects, boolean projectileSuppressionEnabled, String suppressionEntityBlacklist) {
+    private MessageSyncCommandSettings(
+            boolean enablePainVignette,
+            boolean enablePainBlur,
+            boolean enablePainFovCompression,
+            boolean enablePainAudioEffects,
+            boolean projectileSuppressionEnabled,
+            String suppressionEntityBlacklist
+    ) {
         this.enablePainVignette = enablePainVignette;
+        this.enablePainBlur = enablePainBlur;
         this.enablePainFovCompression = enablePainFovCompression;
         this.enablePainAudioEffects = enablePainAudioEffects;
         this.projectileSuppressionEnabled = projectileSuppressionEnabled;
@@ -68,6 +66,7 @@ public class MessageSyncCommandSettings implements CustomPacketPayload {
         }
         return new MessageSyncCommandSettings(
                 FirstAid.enablePainVignette,
+                FirstAid.enablePainBlur,
                 FirstAid.enablePainFovCompression,
                 FirstAid.enablePainAudioEffects,
                 FirstAid.projectileSuppressionEnabled,
@@ -82,6 +81,7 @@ public class MessageSyncCommandSettings implements CustomPacketPayload {
     public static void handle(MessageSyncCommandSettings message, IPayloadContext context) {
         context.enqueueWork(() -> {
             FirstAid.enablePainVignette = message.enablePainVignette;
+            FirstAid.enablePainBlur = message.enablePainBlur;
             FirstAid.enablePainFovCompression = message.enablePainFovCompression;
             FirstAid.enablePainAudioEffects = message.enablePainAudioEffects;
             FirstAid.projectileSuppressionEnabled = message.projectileSuppressionEnabled;

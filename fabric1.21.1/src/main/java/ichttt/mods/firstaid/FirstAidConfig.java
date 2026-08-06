@@ -97,6 +97,8 @@ public final class FirstAidConfig {
         FirstAid.projectileSuppressionEnabled = SERVER.projectileSuppressionEnabled.get();
         FirstAid.lowSuppressionMultiplier = SERVER.lowSuppressionMultiplier.get().floatValue();
         FirstAid.enablePainVignette = SERVER.enablePainVignette.get();
+        FirstAid.enablePainBlur = SERVER.enablePainBlur.get();
+
         FirstAid.enablePainFovCompression = SERVER.enablePainFovCompression.get();
         FirstAid.enablePainAudioEffects = SERVER.enablePainAudioEffects.get();
         FirstAid.rescueWakeUpEnabled = SERVER.rescueWakeUpEnabled.get();
@@ -127,6 +129,7 @@ public final class FirstAidConfig {
         SERVER.projectileSuppressionEnabled.set(FirstAid.projectileSuppressionEnabled);
         SERVER.lowSuppressionMultiplier.set((double) FirstAid.lowSuppressionMultiplier);
         SERVER.enablePainVignette.set(FirstAid.enablePainVignette);
+        SERVER.enablePainBlur.set(FirstAid.enablePainBlur);
         SERVER.enablePainFovCompression.set(FirstAid.enablePainFovCompression);
         SERVER.enablePainAudioEffects.set(FirstAid.enablePainAudioEffects);
         SERVER.rescueWakeUpEnabled.set(FirstAid.rescueWakeUpEnabled);
@@ -267,6 +270,7 @@ public final class FirstAidConfig {
         public final ConfigValue<Boolean> projectileSuppressionEnabled;
         public final ConfigValue<Double> lowSuppressionMultiplier;
         public final ConfigValue<Boolean> enablePainVignette;
+        public final ConfigValue<Boolean> enablePainBlur;
         public final ConfigValue<Boolean> enablePainFovCompression;
         public final ConfigValue<Boolean> enablePainAudioEffects;
         public final ConfigValue<Boolean> rescueWakeUpEnabled;
@@ -280,6 +284,9 @@ public final class FirstAidConfig {
         public final ConfigValue<Integer> morphineUseDuration;
         public final ConfigValue<Integer> painkillersUseDuration;
         public final ConfigValue<Integer> adrenalineUseDuration;
+        public final ConfigValue<Integer> morphineInjectorUseDuration;
+        public final ConfigValue<Boolean> criticalCrawlEnabled;
+        public final ConfigValue<Boolean> addictionEnabled;
         public final ConfigValue<FirstAid.InjuryDebuffMode> injuryDebuffMode;
         public final ConfigValue<Double> lowInjuryDebuffDamageScale;
         public final ConfigValue<Double> lowInjuryDebuffAmplifierScale;
@@ -343,12 +350,13 @@ public final class FirstAidConfig {
             enchMulOverrideIdentifiers = define(stringList("enchantmentOverrideIdentifiers", Collections.singletonList("minecraft:feather_falling"), value -> !value.isBlank()));
             enchMulOverrideMultiplier = define(intList("enchantmentOverrideMultiplier", Collections.singletonList(2), value -> value >= 0 && value <= 4));
 
-            dynamicPainEnabled = define(boolValue("dynamicPainEnabled", false));
+            dynamicPainEnabled = define(boolValue("dynamicPainEnabled", true));
             mildPainLevel = define(intValue("mildPainLevel", 1, 1, 5));
             lowSuppressionEnabled = define(boolValue("lowSuppressionEnabled", false));
             projectileSuppressionEnabled = define(boolValue("projectileSuppressionEnabled", true));
             lowSuppressionMultiplier = define(doubleValue("lowSuppressionMultiplier", 0.4D, 0D, 1D));
             enablePainVignette = define(boolValue("enablePainVignette", true));
+            enablePainBlur = define(boolValue("enablePainBlur", true));
             enablePainFovCompression = define(boolValue("enablePainFovCompression", true));
             enablePainAudioEffects = define(boolValue("enablePainAudioEffects", true));
             rescueWakeUpEnabled = define(boolValue("rescueWakeUpEnabled", true));
@@ -362,6 +370,9 @@ public final class FirstAidConfig {
             morphineUseDuration = define(intValue("morphineUseDuration", 40, 1, 72000));
             painkillersUseDuration = define(intValue("painkillersUseDuration", 32, 1, 72000));
             adrenalineUseDuration = define(intValue("adrenalineUseDuration", 40, 1, 72000));
+            morphineInjectorUseDuration = define(intValue("morphineInjectorUseDuration", 40, 1, 72000));
+            criticalCrawlEnabled = define(boolValue("criticalCrawlEnabled", true));
+            addictionEnabled = define(boolValue("addictionEnabled", true));
             injuryDebuffMode = define(enumValue("injuryDebuffMode", FirstAid.InjuryDebuffMode.NORMAL, FirstAid.InjuryDebuffMode.class));
             lowInjuryDebuffDamageScale = define(doubleValue("lowInjuryDebuffDamageScale", 0.4D, 0D, 1D));
             lowInjuryDebuffAmplifierScale = define(doubleValue("lowInjuryDebuffAmplifierScale", 0.5D, 0D, 1D));
@@ -425,6 +436,7 @@ public final class FirstAidConfig {
         public final ConfigValue<Boolean> enableEasterEggs;
         public final ConfigValue<Integer> visibleDurationTicks;
         public final ConfigValue<Boolean> flash;
+        public final ConfigValue<Boolean> hidePlayerModelIndicators;
 
         public Client() {
             vanillaHealthBarMode = define(enumValue("vanillaHealthBarMode", VanillaHealthbarMode.HIDE, VanillaHealthbarMode.class));
@@ -436,6 +448,7 @@ public final class FirstAidConfig {
             alpha = define(intValue("alpha", 50, 0, 200));
             visibleDurationTicks = define(intValue("visibleDurationTicks", -1, -1, 600));
             flash = define(boolValue("flash", true));
+            hidePlayerModelIndicators = define(boolValue("hidePlayerModelIndicators", true));
             enableSounds = define(boolValue("enableSoundSystem", true));
             enableEasterEggs = define(boolValue("enableEasterEggs", true));
         }

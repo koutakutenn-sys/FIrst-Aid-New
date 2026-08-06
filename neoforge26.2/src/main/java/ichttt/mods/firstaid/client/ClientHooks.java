@@ -114,8 +114,9 @@ public class ClientHooks {
                         unconscious = playerDamageModel.isUnconscious();
                     }
                     if (unconscious) {
-                        state.swimAmount = 0.0F;
-                        state.isVisuallySwimming = false;
+                        // Drive crawl/swim rendering so the body is face-down with limb motion.
+                        state.swimAmount = 1.0F;
+                        state.isVisuallySwimming = true;
                     }
                     state.setRenderData(RenderStateExtensions.UNCONSCIOUS, unconscious);
                     state.setRenderData(RenderStateExtensions.COLLAPSE_PROGRESS, collapseProgress);

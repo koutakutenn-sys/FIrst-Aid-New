@@ -9,14 +9,17 @@
     "LivingEntityHealMixin",
     "MobTargetMixin",
     "PlayerDimensionsMixin",
+    "PlayerPoseMixin",
     "RecipeManagerMixin",
     "PlayerEntityMixin",
-    "ProjectileMixin"
+    "ProjectileMixin",
+    "MilkBucketItemMixin"
   ],
   "client": [
     "client.CameraMixin",
     "client.GuiMixin",
     "client.GameRendererMixin",
+    "client.GameRendererEffectAccessor",
     "client.LivingEntityRendererMixin",
     "client.MouseHandlerMixin",
     "client.PlayerModelMixin",

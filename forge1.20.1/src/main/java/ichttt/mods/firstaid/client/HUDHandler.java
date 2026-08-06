@@ -107,6 +107,7 @@ public class HUDHandler implements ResourceManagerReloadListener, IGuiOverlay {
 
         FirstAidConfig.Client.OverlayMode overlayMode = FirstAidConfig.CLIENT.overlayMode.get();
         boolean playerModel = overlayMode.isPlayerModel();
+        boolean showIndicators = playerModel && !FirstAidConfig.CLIENT.hidePlayerModelIndicators.get();
 
         if (minecraft.screen instanceof ChatScreen && FirstAidConfig.CLIENT.pos.get() == FirstAidConfig.Client.Position.BOTTOM_LEFT) {
             return;
@@ -168,7 +169,7 @@ public class HUDHandler implements ResourceManagerReloadListener, IGuiOverlay {
             stack.pushPose();
             PlayerModelRenderer.renderPlayerHealth(stack, damageModel, fourColors, guiGraphics, flashStateManager.update(Util.getMillis()), alpha, partialTick);
             stack.popPose();
-            StatusSummaryRenderer.renderStatusSummary(
+            if (showIndicators) StatusSummaryRenderer.renderStatusSummary(
                     guiGraphics,
                     minecraft.font,
                     minecraft.player,

@@ -46,8 +46,7 @@ public final class StatusSummaryRenderer {
         int lineY = baseY;
 
         if (damageModel.getPainLevel() > 0) {
-            boolean painSuppressed = player.hasEffect(RegistryObjects.MORPHINE_EFFECT)
-                    || player.hasEffect(RegistryObjects.PAINKILLER_EFFECT);
+            boolean painSuppressed = player.hasEffect(RegistryObjects.PAINKILLER_EFFECT);
             Component painText = painSuppressed
                     ? Component.translatable("firstaid.gui.status.pain_suppressed")
                     : Component.translatable("firstaid.gui.status.pain", Component.translatable(getPainSeverityKey(damageModel.getPainLevel())));

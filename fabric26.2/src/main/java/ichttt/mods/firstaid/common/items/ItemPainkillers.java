@@ -39,7 +39,7 @@ public class ItemPainkillers extends ItemMedicine {
 
    @Override
    public MedicineStatusDisplay getActiveStatus(MedicineStatusContext context) {
-      return context.getPlayer().hasEffect(RegistryObjects.PAINKILLER_EFFECT) && !context.getPlayer().hasEffect(RegistryObjects.MORPHINE_EFFECT)
+      return context.getPlayer().hasEffect(RegistryObjects.PAINKILLER_EFFECT)
          ? new MedicineStatusDisplay(STATUS_ID, Component.translatable("firstaid.gui.status.painkiller"), null, 9425919)
          : null;
    }
