@@ -1,35 +1,21 @@
 /*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  javax.annotation.Nonnull
- *  javax.annotation.Nullable
- *  net.minecraft.client.Minecraft
- *  net.minecraft.core.Holder
- *  net.minecraft.nbt.CompoundTag
- *  net.minecraft.nbt.Tag
- *  net.minecraft.resources.ResourceLocation
- *  net.minecraft.server.level.ServerPlayer
- *  net.minecraft.util.Mth
- *  net.minecraft.world.damagesource.DamageSource
- *  net.minecraft.world.effect.MobEffect
- *  net.minecraft.world.effect.MobEffectInstance
- *  net.minecraft.world.effect.MobEffects
- *  net.minecraft.world.entity.Entity
- *  net.minecraft.world.entity.EntityDimensions
- *  net.minecraft.world.entity.LivingEntity
- *  net.minecraft.world.entity.Pose
- *  net.minecraft.world.entity.ai.attributes.Attribute
- *  net.minecraft.world.entity.ai.attributes.AttributeInstance
- *  net.minecraft.world.entity.ai.attributes.AttributeMap
- *  net.minecraft.world.entity.ai.attributes.AttributeModifier
- *  net.minecraft.world.entity.ai.attributes.AttributeModifier$Operation
- *  net.minecraft.world.entity.ai.attributes.Attributes
- *  net.minecraft.world.entity.player.Player
- *  net.minecraft.world.level.Level
- *  net.minecraft.world.phys.AABB
- *  net.minecraft.world.phys.Vec3
+ * FirstAid
+ * Copyright (C) 2017-2024
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package ichttt.mods.firstaid.common.damagesystem;
 
 import java.util.UUID;

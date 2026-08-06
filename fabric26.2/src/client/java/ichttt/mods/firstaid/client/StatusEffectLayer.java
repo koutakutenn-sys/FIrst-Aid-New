@@ -61,7 +61,7 @@ public class StatusEffectLayer implements HudElement {
                float smoothPain = Mth.lerp(deltaTracker.getGameTimeDeltaTicks(), this.lastPainStrength, this.painStrength);
                float smoothSuppression = Mth.lerp(deltaTracker.getGameTimeDeltaTicks(), this.lastSuppressionStrength, this.suppressionStrength);
                float pulseTime = minecraft.player.tickCount + deltaTracker.getGameTimeDeltaTicks();
-               ClientEventHandler.getPainVisualEffectsController().renderOverlay(guiGraphics, width, height, pulseTime);
+               ClientEventHandler.getPainVisualEffectsController().renderOverlay(guiGraphics, width, height, deltaTracker.getGameTimeDeltaTicks(), pulseTime);
                if (deathDanger > 0.0F && damageModel.getUnconsciousTicks() <= 0) {
                   renderDeathDangerOverlay(guiGraphics, width, height, deathDanger, pulseTime);
                }

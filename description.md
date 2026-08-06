@@ -8,7 +8,7 @@ Original project: [First Aid on CurseForge](https://www.curseforge.com/minecraft
 
 ## 1.3.0 — *Deal with the Devil*
 
-![First Aid New 1.3.0 — Deal with the Devil](./screenshots/1.3.0_poster.png)
+![First Aid New 1.3.0 — Deal with the Devil](https://raw.githubusercontent.com/maoruiQa/FIrst-Aid-New/main/screenshots/1.3.0_poster.png)
 
 *Mercy has a meter. Every dose writes itself onto the glass of the screen.*
 
@@ -34,9 +34,7 @@ Original project: [First Aid on CurseForge](https://www.curseforge.com/minecraft
 | `firstaid-1.3.0+fabric26.2` | Fabric | 26.2 |
 | `firstaid-1.3.0+neoforge26.2` | NeoForge | 26.2 |
 
-Runnable jars for this release live in [`release/`](./release/).
-
-Full notes: [1.3.0changelog.md](./1.3.0changelog.md)
+Full notes: [1.3.0changelog.md](https://github.com/maoruiQa/FIrst-Aid-New/blob/main/1.3.0changelog.md)
 
 ---
 
@@ -55,13 +53,13 @@ Full notes: [1.3.0changelog.md](./1.3.0changelog.md)
 
 ## Screenshots
 
-![Deal with the Devil — 1.3.0 poster](./screenshots/1.3.0_poster.png)
+![Deal with the Devil — 1.3.0 poster](https://raw.githubusercontent.com/maoruiQa/FIrst-Aid-New/main/screenshots/1.3.0_poster.png)
 
-![Pain effect](./screenshots/pain.png)
+![Pain effect](https://raw.githubusercontent.com/maoruiQa/FIrst-Aid-New/main/screenshots/pain.png)
 
-![UI health view](./screenshots/ui.png)
+![UI health view](https://raw.githubusercontent.com/maoruiQa/FIrst-Aid-New/main/screenshots/ui.png)
 
-![Unconsciousness](./screenshots/unconsciousness.png)
+![Unconsciousness](https://raw.githubusercontent.com/maoruiQa/FIrst-Aid-New/main/screenshots/unconsciousness.png)
 
 ---
 
@@ -69,10 +67,10 @@ Full notes: [1.3.0changelog.md](./1.3.0changelog.md)
 
 Third-party mods can register custom treatment items and direct-use medicines:
 
-- Common overview: [docs/firstaid-extension-api.md](./docs/firstaid-extension-api.md)
-- Fabric: [docs/firstaid-extension-fabric.md](./docs/firstaid-extension-fabric.md)
-- NeoForge: [docs/firstaid-extension-neoforge.md](./docs/firstaid-extension-neoforge.md)
-- Forge 1.20.1: [docs/firstaid-extension-forge1.20.1.md](./docs/firstaid-extension-forge1.20.1.md)
+- Common overview: [docs/firstaid-extension-api.md](https://github.com/maoruiQa/FIrst-Aid-New/blob/main/docs/firstaid-extension-api.md)
+- Fabric: [docs/firstaid-extension-fabric.md](https://github.com/maoruiQa/FIrst-Aid-New/blob/main/docs/firstaid-extension-fabric.md)
+- NeoForge: [docs/firstaid-extension-neoforge.md](https://github.com/maoruiQa/FIrst-Aid-New/blob/main/docs/firstaid-extension-neoforge.md)
+- Forge 1.20.1: [docs/firstaid-extension-forge1.20.1.md](https://github.com/maoruiQa/FIrst-Aid-New/blob/main/docs/firstaid-extension-forge1.20.1.md)
 
 ---
 
@@ -213,13 +211,11 @@ R B I
 
 ## Building
 
-Each loader folder under this repository is its own Gradle project. From a module root (example: `forge1.20.1`):
+Each loader folder under the repository is its own Gradle project. From a module root (example: `forge1.20.1`):
 
 ```powershell
 .\gradlew.bat build
 ```
-
-Runnable jars are written to that module’s `build/libs/` and, for releases, collected under [`release/`](./release/).
 
 Maintained module roots:
 
@@ -229,11 +225,11 @@ Maintained module roots:
 - `fabric26.2`
 - `neoforge26.2`
 
+Source repository: [maoruiQa/FIrst-Aid-New](https://github.com/maoruiQa/FIrst-Aid-New)
+
 ---
 
 ## Credits & License
 
 - Based on **First Aid** by ichttt  
 - This port is distributed under **GPL-3.0**, consistent with the original project  
-
-Repository: [maoruiQa/FIrst-Aid-New](https://github.com/maoruiQa/FIrst-Aid-New)
