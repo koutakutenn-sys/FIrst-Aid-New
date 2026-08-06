@@ -280,7 +280,7 @@ public class FirstAidConfig {
                     .define("enablePainAudioEffects", true);
             lowSuppressionEnabled = builder
                     .comment("Persistent toggle for /firstaid suppression (dynamic vs mild)")
-                    .define("lowSuppressionEnabled", false);
+                    .define("lowSuppressionEnabled", true);
             projectileSuppressionEnabled = builder
                     .comment("Persistent toggle for projectile near-miss suppression")
                     .define("projectileSuppressionEnabled", true);

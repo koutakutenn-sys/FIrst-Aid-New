@@ -545,7 +545,7 @@ public class EventHandler {
         FirstAid.enablePainBlur = true;
         FirstAid.enablePainFovCompression = true;
         FirstAid.enablePainAudioEffects = true;
-        FirstAid.lowSuppressionEnabled = false;
+        FirstAid.lowSuppressionEnabled = true;
         FirstAid.projectileSuppressionEnabled = true;
         FirstAid.lowSuppressionMultiplier = 0.4F;
         FirstAid.rescueWakeUpEnabled = true;

@@ -615,7 +615,7 @@ public final class FirstAidConfig {
          this.enablePainBlur = this.define(FirstAidConfig.boolValue("enablePainBlur", true));
          this.enablePainFovCompression = this.define(FirstAidConfig.boolValue("enablePainFovCompression", true));
          this.enablePainAudioEffects = this.define(FirstAidConfig.boolValue("enablePainAudioEffects", true));
-         this.lowSuppressionEnabled = this.define(FirstAidConfig.boolValue("lowSuppressionEnabled", false));
+         this.lowSuppressionEnabled = this.define(FirstAidConfig.boolValue("lowSuppressionEnabled", true));
          this.projectileSuppressionEnabled = this.define(FirstAidConfig.boolValue("projectileSuppressionEnabled", true));
          this.lowSuppressionMultiplier = this.define(FirstAidConfig.doubleValue("lowSuppressionMultiplier", 0.4, 0.0, 1.0));
          this.rescueWakeUpEnabled = this.define(FirstAidConfig.boolValue("rescueWakeUpEnabled", true));

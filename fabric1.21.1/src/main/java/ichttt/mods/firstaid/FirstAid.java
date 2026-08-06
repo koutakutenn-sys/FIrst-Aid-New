@@ -53,7 +53,7 @@ public final class FirstAid {
     public static boolean isSynced = false;
     public static boolean dynamicPainEnabled = true;
     public static int mildPainLevel = 1;
-    public static boolean lowSuppressionEnabled = false;
+    public static boolean lowSuppressionEnabled = true;
     public static boolean projectileSuppressionEnabled = true;
     public static float lowSuppressionMultiplier = 0.4F;
     /** Hit-frequency red edge pulse. */

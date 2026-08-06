@@ -352,7 +352,7 @@ public final class FirstAidConfig {
 
             dynamicPainEnabled = define(boolValue("dynamicPainEnabled", true));
             mildPainLevel = define(intValue("mildPainLevel", 1, 1, 5));
-            lowSuppressionEnabled = define(boolValue("lowSuppressionEnabled", false));
+            lowSuppressionEnabled = define(boolValue("lowSuppressionEnabled", true));
             projectileSuppressionEnabled = define(boolValue("projectileSuppressionEnabled", true));
             lowSuppressionMultiplier = define(doubleValue("lowSuppressionMultiplier", 0.4D, 0D, 1D));
             enablePainVignette = define(boolValue("enablePainVignette", true));

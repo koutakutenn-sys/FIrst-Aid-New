@@ -473,7 +473,7 @@ public final class EventHandler {
         FirstAid.LOGGER.debug("Cleaning up");
         FirstAid.dynamicPainEnabled = false;
         FirstAid.mildPainLevel = 1;
-        FirstAid.lowSuppressionEnabled = false;
+        FirstAid.lowSuppressionEnabled = true;
         FirstAid.projectileSuppressionEnabled = true;
         FirstAid.lowSuppressionMultiplier = 0.4F;
         FirstAid.enablePainVignette = true;
