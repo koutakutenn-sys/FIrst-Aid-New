@@ -87,35 +87,28 @@ public class StatusEffectLayer implements IGuiOverlay {
         float smoothSuppression = Mth.lerp(partialTick, lastSuppressionStrength, suppressionStrength);
         float pulseTime = minecraft.player.tickCount + partialTick;
 
-        if (smoothPain > 0.0F && FirstAid.enablePainVignette) {
-            float pulse = deathDanger > 0.0F
-                    ? 0.82F + (0.18F + deathDanger * 0.27F) * Mth.sin(pulseTime * (0.08F + deathDanger * 0.04F))
-                    : 0.9F + 0.1F * Mth.sin(pulseTime * 0.32F);
-            float intensity = Math.min(PAIN_INTENSITY_MAX, smoothPain * PAIN_INTENSITY_MULTIPLIER * pulse);
-            float rangeScale = 1.0F + Mth.clamp(smoothPain, 0.0F, 1.0F);
-            int thickness = Math.round(PAIN_BASE_THICKNESS * rangeScale);
-            renderVignette(guiGraphics, screenWidth, screenHeight, 138, 24, 24, intensity, thickness);
+        ClientEventHandler.getPainVisualEffectsController().renderOverlay(guiGraphics, screenWidth, screenHeight, pulseTime);
+        if (deathDanger > 0.0F && damageModel.getUnconsciousTicks() <= 0) {
+            renderDeathDangerOverlay(guiGraphics, screenWidth, screenHeight, deathDanger, pulseTime);
         }
 
+        // Dark cool edge kept light — main gray-white rim is drawn by PainVisualEffectsController.
         if (smoothSuppression > 0.0F) {
             float pulse = 0.90F + 0.10F * Mth.sin((pulseTime * 0.46F) + 0.8F);
-            float intensity = Math.min(SUPPRESSION_INTENSITY_MAX, (0.45F + smoothSuppression * 0.75F) * SUPPRESSION_INTENSITY_MULTIPLIER * pulse);
-            renderVignette(guiGraphics, screenWidth, screenHeight, 18, 24, 34, intensity, 30);
-            renderVignette(guiGraphics, screenWidth, screenHeight, 88, 102, 128, Math.min(SUPPRESSION_INTENSITY_MAX, intensity * 0.72F), 18);
-            guiGraphics.fill(0, 0, screenWidth, screenHeight, color(Math.round(12.0F + 48.0F * smoothSuppression * SUPPRESSION_INTENSITY_MULTIPLIER), 16, 18, 22));
+            float intensity = Math.min(0.70F, smoothSuppression * 0.55F * pulse);
+            renderVignette(guiGraphics, screenWidth, screenHeight, 40, 46, 58, intensity * 0.55F, 22);
         }
 
         float tinnitusStrength = suppressionFeedbackController.getTinnitusStrength();
         if (tinnitusStrength > 0.0F) {
             float pulse = 0.84F + 0.16F * Mth.sin(pulseTime * 0.77F + 1.3F);
-            int alpha = Math.round(Math.min(42.0F, (8.0F + 24.0F * tinnitusStrength) * pulse));
-            guiGraphics.fill(0, 0, screenWidth, screenHeight, color(alpha, 198, 205, 214));
             renderVignette(guiGraphics, screenWidth, screenHeight, 210, 214, 224, Math.min(0.38F, tinnitusStrength * 0.22F), 16);
         }
 
         if (damageModel.getUnconsciousTicks() > 0) {
-            guiGraphics.fill(0, 0, screenWidth, screenHeight, color(178, 0, 0, 0));
-            renderVignette(guiGraphics, screenWidth, screenHeight, 0, 0, 0, 0.8F, 24);
+            // Light dim only — continuous blindness was removed; keep surroundings readable.
+            guiGraphics.fill(0, 0, screenWidth, screenHeight, color(78, 0, 0, 0));
+            renderVignette(guiGraphics, screenWidth, screenHeight, 0, 0, 0, 0.42F, 20);
             if (deathDanger > 0.0F) {
                 renderDeathDangerOverlay(guiGraphics, screenWidth, screenHeight, deathDanger, pulseTime);
             }
@@ -167,7 +160,6 @@ public class StatusEffectLayer implements IGuiOverlay {
                 fillEdge(guiGraphics, width, height, color(alpha, red, green, blue), thickness);
             }
         }
-        guiGraphics.fill(0, 0, width, height, color(Math.round(6.0F + (18.0F * intensity)), red, green, blue));
     }
 
     private static void fillEdge(GuiGraphics guiGraphics, int width, int height, int color, int thickness) {

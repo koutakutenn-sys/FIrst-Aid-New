@@ -61,35 +61,28 @@ public class StatusEffectLayer implements HudElement {
                float smoothPain = Mth.lerp(deltaTracker.getGameTimeDeltaTicks(), this.lastPainStrength, this.painStrength);
                float smoothSuppression = Mth.lerp(deltaTracker.getGameTimeDeltaTicks(), this.lastSuppressionStrength, this.suppressionStrength);
                float pulseTime = minecraft.player.tickCount + deltaTracker.getGameTimeDeltaTicks();
-               if (smoothPain > 0.0F && FirstAid.enablePainVignette) {
-                  float pulse = deathDanger > 0.0F
-                     ? 0.82F + (0.18F + deathDanger * 0.27F) * Mth.sin(pulseTime * (0.08F + deathDanger * 0.04F))
-                     : 0.9F + 0.1F * Mth.sin(pulseTime * 0.32F);
-                  float intensity = Math.min(2.0F, smoothPain * 2.0F * pulse);
-                  float rangeScale = 1.0F + Mth.clamp(smoothPain, 0.0F, 1.0F);
-                  int thickness = Math.round(20.0F * rangeScale);
-                  renderVignette(guiGraphics, width, height, 138, 24, 24, intensity, thickness);
+               ClientEventHandler.getPainVisualEffectsController().renderOverlay(guiGraphics, width, height, pulseTime);
+               if (deathDanger > 0.0F && damageModel.getUnconsciousTicks() <= 0) {
+                  renderDeathDangerOverlay(guiGraphics, width, height, deathDanger, pulseTime);
                }
 
+               // Soft cool edge only — continuous gray-white rim is drawn by PainVisualEffectsController.
                if (smoothSuppression > 0.0F) {
                   float pulse = 0.9F + 0.1F * Mth.sin(pulseTime * 0.46F + 0.8F);
-                  float intensity = Math.min(2.0F, (0.45F + smoothSuppression * 0.75F) * 2.0F * pulse);
-                  renderVignette(guiGraphics, width, height, 18, 24, 34, intensity, 30);
-                  renderVignette(guiGraphics, width, height, 88, 102, 128, Math.min(2.0F, intensity * 0.72F), 18);
-                  guiGraphics.fill(0, 0, width, height, color(Math.round(12.0F + 48.0F * smoothSuppression * 2.0F), 16, 18, 22));
+                  float intensity = Math.min(0.55F, smoothSuppression * 0.40F * pulse);
+                  renderVignette(guiGraphics, width, height, 40, 46, 58, intensity * 0.50F, 16);
                }
 
                float tinnitusStrength = suppressionFeedbackController.getTinnitusStrength();
                if (tinnitusStrength > 0.0F) {
                   float pulse = 0.84F + 0.16F * Mth.sin(pulseTime * 0.77F + 1.3F);
-                  int alpha = Math.round(Math.min(42.0F, (8.0F + 24.0F * tinnitusStrength) * pulse));
-                  guiGraphics.fill(0, 0, width, height, color(alpha, 198, 205, 214));
                   renderVignette(guiGraphics, width, height, 210, 214, 224, Math.min(0.38F, tinnitusStrength * 0.22F), 16);
                }
 
                if (damageModel.getUnconsciousTicks() > 0) {
-                  guiGraphics.fill(0, 0, width, height, color(178, 0, 0, 0));
-                  renderVignette(guiGraphics, width, height, 0, 0, 0, 0.8F, 24);
+                  // Light dim only — continuous blindness was removed; keep surroundings readable.
+                  guiGraphics.fill(0, 0, width, height, color(78, 0, 0, 0));
+                  renderVignette(guiGraphics, width, height, 0, 0, 0, 0.42F, 20);
                   if (deathDanger > 0.0F) {
                      renderDeathDangerOverlay(guiGraphics, width, height, deathDanger, pulseTime);
                   }
@@ -158,8 +151,6 @@ public class StatusEffectLayer implements HudElement {
                fillEdge(guiGraphics, width, height, color(alpha, red, green, blue), thickness);
             }
          }
-
-         guiGraphics.fill(0, 0, width, height, color(Math.round(6.0F + 18.0F * intensity), red, green, blue));
       }
    }
 
@@ -280,13 +271,49 @@ public class StatusEffectLayer implements HudElement {
       GuiGraphicsExtractor guiGraphics, Minecraft minecraft, AbstractPlayerDamageModel damageModel, @Nullable PlayerDamageModel playerDamageModel
    ) {
       int lineY = 8;
-      if (damageModel.getPainLevel() > 0) {
-         boolean painSuppressed = minecraft.player.hasEffect(RegistryObjects.MORPHINE_EFFECT) || minecraft.player.hasEffect(RegistryObjects.PAINKILLER_EFFECT);
+            if (damageModel.getPainLevel() > 0) {
+         boolean painSuppressed = minecraft.player.hasEffect(RegistryObjects.PAINKILLER_EFFECT)
+            || minecraft.player.hasEffect(RegistryObjects.MORPHINE_EFFECT);
          Component painText = painSuppressed
             ? Component.translatable("firstaid.gui.status.pain_suppressed")
             : Component.translatable("firstaid.gui.status.pain", new Object[]{Component.translatable(getPainSeverityKey(damageModel.getPainLevel()))});
          guiGraphics.text(minecraft.font, painText, 8, lineY, painSuppressed ? 9425919 : 16747146);
          lineY += 10;
+      }
+
+      if (playerDamageModel != null) {
+         int pulse = playerDamageModel.getAddictionPulseType();
+         if (pulse == PlayerDamageModel.PULSE_INCREASE) {
+            guiGraphics.text(minecraft.font, Component.translatable("firstaid.gui.status.addiction_increase"), 8, lineY, 0xE8A0A0);
+            lineY += 10;
+         } else if (pulse == PlayerDamageModel.PULSE_ULTRA_INCREASE) {
+            guiGraphics.text(minecraft.font, Component.translatable("firstaid.gui.status.addiction_ultra_increase"), 8, lineY, 0xFF6A6A);
+            lineY += 10;
+         } else if (pulse == PlayerDamageModel.PULSE_DECREASE) {
+            guiGraphics.text(minecraft.font, Component.translatable("firstaid.gui.status.addiction_decrease"), 8, lineY, 0x90C090);
+            lineY += 10;
+         }
+         if (playerDamageModel.getWithdrawalEpisodeTicksLeft() > 0) {
+            int flags = playerDamageModel.getWithdrawalEpisodeType();
+            guiGraphics.text(minecraft.font, Component.translatable("firstaid.gui.status.withdrawal_pain"), 8, lineY, 0xC8A2C8);
+            lineY += 10;
+            if ((flags & PlayerDamageModel.EPISODE_DARKNESS) != 0) {
+               guiGraphics.text(minecraft.font, Component.translatable("firstaid.gui.status.withdrawal_darkness"), 8, lineY, 0xC8A2C8);
+               lineY += 10;
+            }
+            if ((flags & PlayerDamageModel.EPISODE_NAUSEA) != 0) {
+               guiGraphics.text(minecraft.font, Component.translatable("firstaid.gui.status.withdrawal_nausea"), 8, lineY, 0xC8A2C8);
+               lineY += 10;
+            }
+            if ((flags & PlayerDamageModel.EPISODE_WEAKNESS) != 0) {
+               guiGraphics.text(minecraft.font, Component.translatable("firstaid.gui.status.withdrawal_weakness"), 8, lineY, 0xC8A2C8);
+               lineY += 10;
+            }
+            if ((flags & PlayerDamageModel.EPISODE_SLOWNESS) != 0) {
+               guiGraphics.text(minecraft.font, Component.translatable("firstaid.gui.status.withdrawal_slowness"), 8, lineY, 0xC8A2C8);
+               lineY += 10;
+            }
+         }
       }
 
       if (damageModel.getAdrenalineLevel() > 0) {

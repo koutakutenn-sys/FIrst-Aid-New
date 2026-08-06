@@ -30,14 +30,18 @@ import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.client.sounds.WeighedSoundEvents;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.client.event.sound.PlaySoundEvent;
 
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.Set;
 
 public final class SuppressionFeedbackController {
@@ -49,10 +53,48 @@ public final class SuppressionFeedbackController {
     private static final float PAIN_FOV_DECAY = 0.04F;
     private static final int SEVERE_PAIN_LEVEL = 4;
     private static final int SEVERE_PAIN_SOUND_COOLDOWN_TICKS = 60;
+    private static final float HIGH_SUPPRESSION_TINNITUS_THRESHOLD = 0.42F;
+    private static final int HIGH_SUPPRESSION_TINNITUS_COOLDOWN_TICKS = 36;
+    private static final float MUSIC_DETUNE_ADDICTION_THRESHOLD = 0.35F;
 
+    /**
+     * Vanilla hallucination stingers during withdrawal (sudden, non-looping).
+     * Frequency scales with addiction severity while an episode is active.
+     */
+    private static final List<ResourceLocation> WITHDRAWAL_HALLUCINATION_SOUND_IDS = List.of(
+            new ResourceLocation("minecraft", "block.portal.ambient"),
+            new ResourceLocation("minecraft", "block.portal.trigger"),
+            new ResourceLocation("minecraft", "block.portal.travel"),
+            new ResourceLocation("minecraft", "entity.generic.explode"),
+            new ResourceLocation("minecraft", "entity.creeper.primed"),
+            new ResourceLocation("minecraft", "entity.ghast.ambient"),
+            new ResourceLocation("minecraft", "entity.ghast.scream"),
+            new ResourceLocation("minecraft", "entity.ghast.warn"),
+            new ResourceLocation("minecraft", "entity.enderman.ambient"),
+            new ResourceLocation("minecraft", "entity.enderman.scream"),
+            new ResourceLocation("minecraft", "entity.enderman.stare"),
+            new ResourceLocation("minecraft", "entity.enderman.teleport"),
+            new ResourceLocation("minecraft", "ambient.cave"),
+            new ResourceLocation("minecraft", "entity.warden.heartbeat"),
+            new ResourceLocation("minecraft", "entity.warden.nearby_close"),
+            new ResourceLocation("minecraft", "block.sculk_shrieker.shriek"),
+            new ResourceLocation("minecraft", "entity.phantom.ambient"),
+            new ResourceLocation("minecraft", "entity.phantom.swoop"),
+            new ResourceLocation("minecraft", "entity.elder_guardian.curse"),
+            new ResourceLocation("minecraft", "block.respawn_anchor.ambient"),
+            new ResourceLocation("minecraft", "block.respawn_anchor.deplete"),
+            new ResourceLocation("minecraft", "entity.vex.ambient"),
+            new ResourceLocation("minecraft", "entity.vex.charge"),
+            new ResourceLocation("minecraft", "entity.illusioner.mirror_move"),
+            new ResourceLocation("minecraft", "entity.illusioner.cast_spell"),
+            new ResourceLocation("minecraft", "entity.wither.ambient"),
+            new ResourceLocation("minecraft", "entity.zombie_villager.cure"),
+            new ResourceLocation("minecraft", "block.beacon.deactivate")
+    );
     private float suppressionIntensity;
     private int holdTicks;
     private float audioMuffleStrength;
+    private float musicDetuneStrength;
     private float tinnitusStrength;
     private float shakeStrength;
     private float sustainedFovCompression;
@@ -63,6 +105,7 @@ public final class SuppressionFeedbackController {
     private float fovImpulse;
     private long soundCooldownUntilGameTime;
     private int lastPainLevel;
+    private int hallucinationCooldownTicks;
     private @Nullable Level trackedLevel;
 
     public void tick(Minecraft client) {
@@ -83,6 +126,10 @@ public final class SuppressionFeedbackController {
         suppressionIntensity = (playerDamageModel == null ? 0.0F : playerDamageModel.getSuppressionIntensity()) * suppressionScale;
         holdTicks = playerDamageModel == null ? 0 : playerDamageModel.getSuppressionHoldTicks();
 
+        boolean withdrawalActive = playerDamageModel != null && playerDamageModel.isWithdrawalEpisodeActive();
+
+        float addictionNorm = playerDamageModel == null ? 0.0F : playerDamageModel.getAddictionNormalized();
+
         boolean painSuppressed = player.hasEffect(RegistryObjects.MORPHINE_EFFECT.get())
                 || player.hasEffect(RegistryObjects.PAINKILLER_EFFECT.get());
         float targetPainFov = painSuppressed || playerDamageModel == null || !FirstAid.enablePainFovCompression
@@ -90,12 +137,21 @@ public final class SuppressionFeedbackController {
                 : playerDamageModel.getPainVisualStrength() * PAIN_FOV_MAX_REDUCTION;
 
         boolean holding = holdTicks > 0;
-        float targetMuffle = holding ? Math.max(0.88F, suppressionIntensity * 1.12F) : suppressionIntensity * 0.98F;
+        float targetMuffle = holding ? Math.max(0.35F, suppressionIntensity * 0.55F) : suppressionIntensity * 0.42F;
+        float targetMusicDetune = 0.0F;
+        if (withdrawalActive && addictionNorm >= MUSIC_DETUNE_ADDICTION_THRESHOLD) {
+            targetMusicDetune = 0.22F + (addictionNorm - MUSIC_DETUNE_ADDICTION_THRESHOLD)
+                    / (1.0F - MUSIC_DETUNE_ADDICTION_THRESHOLD) * 0.55F;
+        }
         float targetTinnitus = holding ? Math.max(0.48F, suppressionIntensity * 0.64F) : suppressionIntensity * 0.42F;
-        float targetShake = holding ? 0.38F + suppressionIntensity * 0.55F : suppressionIntensity * 0.34F;
-        float targetFovCompression = holding ? 4.4F + suppressionIntensity * 7.0F : suppressionIntensity * 3.6F;
+        if (withdrawalActive) {
+            targetTinnitus = Math.max(targetTinnitus, 0.18F + addictionNorm * 0.40F);
+        }
+        float targetShake = holding ? 0.12F + suppressionIntensity * 0.18F : suppressionIntensity * 0.10F;
+        float targetFovCompression = holding ? 1.2F + suppressionIntensity * 2.0F : suppressionIntensity * 1.0F;
 
-        audioMuffleStrength = approach(audioMuffleStrength, targetMuffle, targetMuffle > audioMuffleStrength ? 0.22F : 0.025F);
+        audioMuffleStrength = approach(audioMuffleStrength, targetMuffle, targetMuffle > audioMuffleStrength ? 0.18F : 0.020F);
+        musicDetuneStrength = approach(musicDetuneStrength, targetMusicDetune, targetMusicDetune > musicDetuneStrength ? 0.10F : 0.03F);
         tinnitusStrength = approach(tinnitusStrength, targetTinnitus, targetTinnitus > tinnitusStrength ? 0.12F : 0.02F);
         shakeStrength = approach(shakeStrength, targetShake, targetShake > shakeStrength ? 0.10F : 0.015F);
         sustainedFovCompression = approach(sustainedFovCompression, targetFovCompression, targetFovCompression > sustainedFovCompression ? 0.16F : 0.03F);
@@ -106,11 +162,17 @@ public final class SuppressionFeedbackController {
         pitchImpulse *= 0.85F;
         fovImpulse *= holding ? 0.93F : 0.83F;
 
-        if (FirstAidConfig.CLIENT.enableSounds.get() && FirstAid.enablePainAudioEffects && painLevel >= SEVERE_PAIN_LEVEL && lastPainLevel < SEVERE_PAIN_LEVEL
-                && level.getGameTime() >= soundCooldownUntilGameTime) {
-            soundCooldownUntilGameTime = level.getGameTime() + SEVERE_PAIN_SOUND_COOLDOWN_TICKS;
-            playTinnitusSound(0.52F + 0.12F * Math.min(2, painLevel - SEVERE_PAIN_LEVEL));
+        if (FirstAidConfig.CLIENT.enableSounds.get() && level.getGameTime() >= soundCooldownUntilGameTime) {
+            if (suppressionIntensity >= HIGH_SUPPRESSION_TINNITUS_THRESHOLD) {
+                soundCooldownUntilGameTime = level.getGameTime() + HIGH_SUPPRESSION_TINNITUS_COOLDOWN_TICKS;
+                playTinnitusSound(0.38F + suppressionIntensity * 0.40F);
+            } else if (FirstAid.enablePainAudioEffects && painLevel >= SEVERE_PAIN_LEVEL && lastPainLevel < SEVERE_PAIN_LEVEL) {
+                soundCooldownUntilGameTime = level.getGameTime() + SEVERE_PAIN_SOUND_COOLDOWN_TICKS;
+                playTinnitusSound(0.52F + 0.12F * Math.min(2, painLevel - SEVERE_PAIN_LEVEL));
+            }
         }
+
+        tickWithdrawalHallucinations(player, level, withdrawalActive, addictionNorm);
 
         lastPainLevel = painLevel;
     }
@@ -174,19 +236,34 @@ public final class SuppressionFeedbackController {
     }
 
     public void onPlaySound(PlaySoundEvent event) {
+        if (!FirstAidConfig.CLIENT.enableSounds.get()) {
+            return;
+        }
         SoundInstance original = event.getSound();
-        if (original == null || audioMuffleStrength <= 0.01F || original instanceof MuffledSoundInstance) {
+        if (original == null || original instanceof MuffledSoundInstance) {
             return;
         }
 
         ResourceLocation location = original.getLocation();
-        if (location == null || INTERNAL_SOUNDS.contains(location)) {
+        if (location != null && INTERNAL_SOUNDS.contains(location)) {
             return;
         }
 
-        float volumeScale = Mth.clamp(1.0F - (audioMuffleStrength * 0.55F), 0.18F, 1.0F);
-        float pitchScale = Mth.clamp(1.0F - (audioMuffleStrength * 0.20F), 0.65F, 1.0F);
-        event.setSound(new MuffledSoundInstance(original, volumeScale, pitchScale));
+        boolean isMusic = original.getSource() == SoundSource.MUSIC || original.getSource() == SoundSource.RECORDS;
+        if (isMusic) {
+            if (musicDetuneStrength <= 0.01F) {
+                return;
+            }
+            float volumeScale = Mth.clamp(1.0F - musicDetuneStrength * 0.35F, 0.35F, 1.0F);
+            float pitchScale = Mth.clamp(1.0F - musicDetuneStrength * 0.38F, 0.55F, 1.0F);
+            event.setSound(new MuffledSoundInstance(original, volumeScale, pitchScale));
+            return;
+        }
+        if (audioMuffleStrength <= 0.01F) {
+            return;
+        }
+        float volumeScale = Mth.clamp(1.0F - audioMuffleStrength * 0.40F, 0.45F, 1.0F);
+        event.setSound(new MuffledSoundInstance(original, volumeScale, 1.0F));
     }
 
     private void playTinnitusSound(float severity) {
@@ -198,6 +275,7 @@ public final class SuppressionFeedbackController {
         suppressionIntensity = 0.0F;
         holdTicks = 0;
         audioMuffleStrength = 0.0F;
+        musicDetuneStrength = 0.0F;
         tinnitusStrength = 0.0F;
         shakeStrength = 0.0F;
         sustainedFovCompression = 0.0F;
@@ -208,7 +286,58 @@ public final class SuppressionFeedbackController {
         fovImpulse = 0.0F;
         soundCooldownUntilGameTime = level == null ? 0L : level.getGameTime();
         lastPainLevel = 0;
+        hallucinationCooldownTicks = 0;
         trackedLevel = level;
+    }
+
+
+    private void tickWithdrawalHallucinations(Player player, Level level, boolean withdrawalActive, float addictionNorm) {
+        if (!withdrawalActive || !FirstAidConfig.CLIENT.enableSounds.get()) {
+            hallucinationCooldownTicks = Math.max(0, hallucinationCooldownTicks - 1);
+            return;
+        }
+        if (hallucinationCooldownTicks > 0) {
+            hallucinationCooldownTicks--;
+            return;
+        }
+        if (player.tickCount % 20 != 0) {
+            return;
+        }
+        float chance = 0.015F + addictionNorm * addictionNorm * 0.14F;
+        RandomSource random = level.random;
+        if (random.nextFloat() > chance) {
+            return;
+        }
+        playWithdrawalHallucination(player, level, addictionNorm, random);
+        int minGap = Math.round(Mth.lerp(addictionNorm, 20 * 12, 20 * 2.5F));
+        int extra = random.nextInt(Math.max(1, Math.round(Mth.lerp(addictionNorm, 20 * 10, 20 * 3))));
+        hallucinationCooldownTicks = minGap + extra;
+    }
+
+    private void playWithdrawalHallucination(Player player, Level level, float addictionNorm, RandomSource random) {
+        if (WITHDRAWAL_HALLUCINATION_SOUND_IDS.isEmpty()) {
+            return;
+        }
+        ResourceLocation id = WITHDRAWAL_HALLUCINATION_SOUND_IDS.get(random.nextInt(WITHDRAWAL_HALLUCINATION_SOUND_IDS.size()));
+        SoundEvent sound = ForgeRegistries.SOUND_EVENTS.getValue(id);
+        if (sound == null) {
+            return;
+        }
+        float volume = 0.35F + random.nextFloat() * 0.45F + addictionNorm * 0.15F;
+        float pitch = 0.65F + random.nextFloat() * 0.70F;
+        double ox = (random.nextDouble() - 0.5D) * 2.4D;
+        double oy = random.nextDouble() * 1.2D;
+        double oz = (random.nextDouble() - 0.5D) * 2.4D;
+        level.playLocalSound(
+                player.getX() + ox,
+                player.getY() + player.getEyeHeight() * 0.6D + oy,
+                player.getZ() + oz,
+                sound,
+                SoundSource.AMBIENT,
+                volume,
+                pitch,
+                false
+        );
     }
 
     private static float approach(float current, float target, float delta) {

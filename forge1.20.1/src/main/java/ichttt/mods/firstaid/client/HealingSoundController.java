@@ -141,7 +141,7 @@ public final class HealingSoundController {
 
             SoundEvent loopSound = itemMedicine.getUseLoopSound(useStack);
             if (loopSound != null) {
-                if (activeMedicineLoopSound == null || activeMedicineLoopSound.isStopped() || !activeMedicineLoopSound.matches(player, useStack)) {
+                if (activeMedicineLoopSound == null || !activeMedicineLoopSound.matches(player, useStack)) {
                     stopMedicineLoopSound(soundManager);
                     ItemStack playingStack = useStack.copy();
                     playingStack.setCount(1);

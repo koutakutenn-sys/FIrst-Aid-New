@@ -110,8 +110,12 @@ public final class HealingSoundController {
 
          SoundEvent loopSound = itemMedicine.getUseLoopSound(useStack);
          if (loopSound != null) {
-            if (activeMedicineLoopSound == null || activeMedicineLoopSound.isStopped() || !activeMedicineLoopSound.matches(player, useStack)) {
+            // Only (re)start when missing or item changed — not on every natural end of a non-loop clip.
+            if (activeMedicineLoopSound == null || !activeMedicineLoopSound.matches(player, useStack)) {
                stopMedicineLoopSound(soundManager);
+               activeMedicineLoopSound = new HealingSoundController.ItemUseSound(player, useStack.copyWithCount(1), loopSound);
+               soundManager.play(activeMedicineLoopSound);
+            } else if (activeMedicineLoopSound.isStopped()) {
                activeMedicineLoopSound = new HealingSoundController.ItemUseSound(player, useStack.copyWithCount(1), loopSound);
                soundManager.play(activeMedicineLoopSound);
             }
