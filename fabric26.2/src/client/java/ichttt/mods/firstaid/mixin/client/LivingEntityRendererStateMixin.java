@@ -6,6 +6,7 @@ import ichttt.mods.firstaid.common.util.CommonUtils;
 import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -29,6 +30,12 @@ public abstract class LivingEntityRendererStateMixin<T extends LivingEntity, S e
 
          renderState.setData(RenderStateExtensions.UNCONSCIOUS, unconscious);
          renderState.setData(RenderStateExtensions.COLLAPSE_PROGRESS, collapseProgress);
+
+         // Drive vanilla crawl/swim orientation without custom pitch that buries the head.
+         if (unconscious && renderState instanceof HumanoidRenderState humanoid) {
+            humanoid.swimAmount = 1.0F;
+            humanoid.isVisuallySwimming = true;
+         }
       }
    }
 }

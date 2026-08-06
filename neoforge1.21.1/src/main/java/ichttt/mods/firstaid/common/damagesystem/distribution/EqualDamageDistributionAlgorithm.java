@@ -112,7 +112,7 @@ public class EqualDamageDistributionAlgorithm implements IDamageDistributionAlgo
                 if (part.currentHealth > 0F) {
                     float damageMultiplier = DamageDistribution.getIncomingPartDamageMultiplier(damageModel, part);
                     float scaledDamage = toDamage * damageMultiplier;
-                    float scaledLeft = part.damage(scaledDamage, player, !player.hasEffect(RegistryObjects.MORPHINE_EFFECT), tryNoKillThisRound ? 1F : 0F);
+                    float scaledLeft = part.damage(scaledDamage, player, !player.hasEffect(RegistryObjects.PAINKILLER_EFFECT), tryNoKillThisRound ? 1F : 0F);
                     effectiveDamageDone += scaledDamage - scaledLeft;
                     damageLeft += Math.min(toDamage, DamageDistribution.restoreOriginalDamageScale(scaledLeft, damageMultiplier));
                     divCount++;

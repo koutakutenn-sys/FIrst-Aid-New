@@ -5,12 +5,15 @@ import com.mojang.math.Axis;
 import ichttt.mods.firstaid.client.RenderStateExtensions;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.entity.player.PlayerRenderer;
-import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Face-down crawl orientation while downed (not face-up corpse roll).
+ * XP -90 pitches the body into the ground like vanilla swimming/crawl.
+ */
 @Mixin(PlayerRenderer.class)
 public abstract class PlayerRendererMixin {
     @Inject(
@@ -24,10 +27,10 @@ public abstract class PlayerRendererMixin {
         }
 
         float collapseProgress = RenderStateExtensions.getCollapseProgress(entity);
-        poseStack.mulPose(Axis.YP.rotationDegrees(Mth.lerp(collapseProgress, 180.0F - bodyRot, 90.0F - bodyRot)));
-        poseStack.mulPose(Axis.ZP.rotationDegrees(90.0F * collapseProgress));
-        poseStack.mulPose(Axis.YP.rotationDegrees(270.0F * collapseProgress));
-        poseStack.translate(0.0D, -0.9D * collapseProgress, -0.1D * collapseProgress);
+        // Face-down crawl: pitch into the ground, small settle only (large Y bury the head).
+        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - bodyRot));
+        poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F * collapseProgress));
+        poseStack.translate(0.0D, -0.15D * collapseProgress, 0.20D * collapseProgress);
         ci.cancel();
     }
 }
