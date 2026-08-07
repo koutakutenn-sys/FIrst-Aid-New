@@ -43,7 +43,8 @@ public final class PainVisualEffectsController {
     private float lastMissingHealth = -1.0F;
     private int lastHurtTime = -1;
     private boolean compositeActive;
-    private boolean effectLoadFailed;
+    private int loadFailCooldown;
+    private int loadFailStreak;
 
     public void tick(Minecraft client) {
         Player player = client.player;
@@ -89,14 +90,18 @@ public final class PainVisualEffectsController {
         }
 
         float targetMorphine = 0.0F;
-        if (hasMorphine && model != null) {
-            float ratio = model.getMorphineRemainingRatio();
-            if (ratio <= 0.0F && model.getMorphineTicks() > 0) {
+        if (hasMorphine) {
+            float ratio = 0.0F;
+            if (model != null) {
+                ratio = model.getMorphineRemainingRatio();
+                // Model ticks/max can lag the mob effect by a sync; keep sat visible.
+                if (ratio <= 0.0F && (model.getMorphineTicks() > 0 || player.hasEffect(RegistryObjects.MORPHINE_EFFECT))) {
+                    ratio = 1.0F;
+                }
+            } else {
                 ratio = 1.0F;
             }
             targetMorphine = smoothstep(Mth.clamp(ratio, 0.0F, 1.0F));
-        } else if (hasMorphine) {
-            targetMorphine = 1.0F;
         }
 
         float modelSuppression = model == null ? 0.0F : model.getSuppressionIntensity();
@@ -119,7 +124,8 @@ public final class PainVisualEffectsController {
         lastHurtTime = -1;
         shutdown(client);
         compositeActive = false;
-        effectLoadFailed = false;
+        loadFailCooldown = 0;
+        loadFailStreak = 0;
     }
 
     public float getPainStrength() { return painStrength; }
@@ -143,7 +149,8 @@ public final class PainVisualEffectsController {
     }
 
     public void processFrame(Minecraft client, float partialTick) {
-        applyUniforms(client);
+        // Re-assert ownership each frame: vanilla may clear postEffect between ticks (F5 / camera).
+        updateEffect(client);
     }
 
     private void tickHitPulse(Player player, PlayerDamageModel model, boolean painSuppressed) {
@@ -173,37 +180,64 @@ public final class PainVisualEffectsController {
     }
 
     private void updateEffect(Minecraft client) {
-        if (client.gameRenderer == null || effectLoadFailed) {
+        if (client.gameRenderer == null) {
             return;
         }
+        if (loadFailCooldown > 0) {
+            loadFailCooldown--;
+        }
+
         boolean want = Math.abs(getNetColorAmount()) > 0.02F
                 || painStrength > 0.03F
                 || (suppressionStrength > 0.04F && FirstAid.enablePainBlur);
-        if (want == compositeActive) {
-            applyUniforms(client);
+
+        PostChain chain = getPostEffect(client);
+        boolean ours = isOurComposite(chain);
+        // Keep flag honest: vanilla may clear postEffect (camera change / F5) without telling us.
+        compositeActive = ours;
+
+        if (!want) {
+            if (ours) {
+                shutdown(client);
+                compositeActive = false;
+            }
             return;
         }
-        try {
-            if (!want) {
-                ((GameRendererEffectAccessor) client.gameRenderer).firstaid$shutdownEffect();
-                compositeActive = false;
-            } else {
-                ((GameRendererEffectAccessor) client.gameRenderer).firstaid$loadEffect(COMPOSITE_EFFECT);
-                compositeActive = true;
-                applyUniforms(client);
+
+        if (!ours) {
+            if (loadFailCooldown > 0) {
+                return;
             }
-        } catch (Exception e) {
-            effectLoadFailed = true;
-            compositeActive = false;
-            FirstAid.LOGGER.error("Failed to load firstaid composite post effect", e);
+            try {
+                ((GameRendererEffectAccessor) client.gameRenderer).firstaid$loadEffect(COMPOSITE_EFFECT);
+                chain = getPostEffect(client);
+                ours = isOurComposite(chain);
+                compositeActive = ours;
+                if (!ours) {
+                    // loadEffect swallows IO/JSON errors; treat as soft failure and retry later.
+                    loadFailStreak = Math.min(loadFailStreak + 1, 8);
+                    loadFailCooldown = 20 * loadFailStreak;
+                    FirstAid.LOGGER.warn(
+                            "FirstAid composite post effect not active after load (streak={}); will retry",
+                            loadFailStreak
+                    );
+                    return;
+                }
+                loadFailStreak = 0;
+                loadFailCooldown = 0;
+            } catch (Exception e) {
+                compositeActive = false;
+                loadFailStreak = Math.min(loadFailStreak + 1, 8);
+                loadFailCooldown = 20 * loadFailStreak;
+                FirstAid.LOGGER.error("Failed to load firstaid composite post effect", e);
+                return;
+            }
         }
+
+        applyUniforms(client, chain);
     }
 
-    private void applyUniforms(Minecraft client) {
-        if (client.gameRenderer == null || !compositeActive) {
-            return;
-        }
-        PostChain chain = ((GameRendererEffectAccessor) client.gameRenderer).firstaid$getPostEffect();
+    private void applyUniforms(Minecraft client, PostChain chain) {
         if (chain == null) {
             return;
         }
@@ -222,12 +256,35 @@ public final class PainVisualEffectsController {
         PostChainUniforms.setFloat(chain, "Strength", blur);
     }
 
+    private static PostChain getPostEffect(Minecraft client) {
+        if (client.gameRenderer == null) {
+            return null;
+        }
+        return ((GameRendererEffectAccessor) client.gameRenderer).firstaid$getPostEffect();
+    }
+
+    private static boolean isOurComposite(PostChain chain) {
+        if (chain == null) {
+            return false;
+        }
+        String name = chain.getName();
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+        // PostChain stores ResourceLocation.toString(), e.g. firstaid:shaders/post/composite.json
+        return name.contains("firstaid") && name.contains("composite");
+    }
+
     private void shutdown(Minecraft client) {
         if (client.gameRenderer == null) {
             return;
         }
         try {
-            ((GameRendererEffectAccessor) client.gameRenderer).firstaid$shutdownEffect();
+            PostChain chain = getPostEffect(client);
+            // Only tear down our own chain — do not clobber creeper/spider vision etc.
+            if (isOurComposite(chain)) {
+                ((GameRendererEffectAccessor) client.gameRenderer).firstaid$shutdownEffect();
+            }
         } catch (Exception ignored) {
         }
     }
