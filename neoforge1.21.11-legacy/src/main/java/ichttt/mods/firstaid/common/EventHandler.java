@@ -401,11 +401,6 @@ public class EventHandler {
     }
 
     @SubscribeEvent
-    public static void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific event) {
-        cancelIfUnconscious(event);
-    }
-
-    @SubscribeEvent
     public static void onAttackEntity(AttackEntityEvent event) {
         if (isUnconscious(event.getEntity())) {
             event.setCanceled(true);
