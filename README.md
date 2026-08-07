@@ -12,17 +12,15 @@ Original project: [First Aid on CurseForge](https://www.curseforge.com/minecraft
 
 *Mercy has a meter. Every dose writes itself onto the glass of the screen.*
 
-**1.3.0** is the release that treats the HUD like a nervous system. Pain is no longer a flat filter. Morphine is no longer a binary wash. Suppression is no longer a single gray shrug. The battlefield is graded again—soft where it should be soft, brutal where it should be brutal.
+**1.3.0** introduces a more immersive HUD feedback system that makes the screen feel like a nervous system. It builds on previous morphine and addiction features with enhanced visual effects, graded pain and suppression, and refined integration across the board.
 
-### What’s new in this deal
+### Key new features in 1.3.0 compared to previous versions
 
-| Theme | What you feel |
-|--------|----------------|
-| **The price of relief** | Morphine saturation fades with remaining duration. The last minutes of calm do not look like the first. |
-| **The cost of concentration** | The Morphine Injector now costs **two Morphine** (plus iron, redstone, glass bottle). Concentrated mercy is no longer a one-pill craft. |
-| **The devil in the details** | Stronger suppression desaturation, pain-like blur under fire, continuous gray-white edge wash that scales with pressure. |
-| **The rush** | Adrenaline injector combat package locks screen blur to **moderate** pain strength—tunnel vision for the fight, even under painkillers. |
-| **The fine print** | Milk fully clears morphine model state (no sticky `00:00`). Addiction still rises on use, but rise/withdrawal icons no longer sit on top of an active morphine dose. |
+- **Dynamic morphine saturation and graded suppression**: Morphine saturation now fades smoothly with remaining duration; suppression provides stronger, tiered desaturation and blur effects that scale clearly between mild, medium, and high pressure.
+- **Advanced post-processing**: Composite pain/color processing with radial blur, continuous gray-white suppression rim/edge wash, and hit-frequency red pulse vignette.
+- **Seamless adrenaline integration**: Adrenaline rush blur now locks to moderate pain strength even under painkillers for better combat feedback.
+- **Improved morphine-milk interaction**: Milk fully and cleanly clears morphine model state without leftovers.
+- **Recipe update**: The Morphine Injector now requires two Morphine (in addition to iron, redstone, and a glass bottle).
 
 ### Supported builds (1.3.0)
 
