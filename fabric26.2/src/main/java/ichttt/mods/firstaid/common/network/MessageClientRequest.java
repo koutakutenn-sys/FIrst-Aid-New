@@ -58,6 +58,8 @@ public class MessageClientRequest implements CustomPacketPayload {
             EventHandler.attemptImmediateRescue(player);
          } else if (message.type == MessageClientRequest.RequestType.ATTEMPT_EXECUTION) {
             EventHandler.attemptImmediateExecution(player);
+         } else if (message.type == MessageClientRequest.RequestType.ATTEMPT_SELF_DEFIB) {
+            EventHandler.attemptSelfDefibrillator(player);
          }
       });
    }
@@ -67,7 +69,8 @@ public class MessageClientRequest implements CustomPacketPayload {
       REQUEST_REFRESH,
       GIVE_UP,
       ATTEMPT_RESCUE,
-      ATTEMPT_EXECUTION;
+      ATTEMPT_EXECUTION,
+      ATTEMPT_SELF_DEFIB;
 
       private static final MessageClientRequest.RequestType[] TYPES = values();
    }

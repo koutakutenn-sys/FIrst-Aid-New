@@ -546,6 +546,7 @@ public class EventHandler {
             damageModel.forEach(damageablePart -> damageablePart.heal(damageablePart.getMaxHealth(), player, false));
             if (damageModel instanceof PlayerDamageModel playerDamageModel) {
                 playerDamageModel.clearStatusEffects();
+                playerDamageModel.beginAudioMute(80);
             }
             damageModel.scheduleResync();
         }
@@ -918,6 +919,29 @@ public class EventHandler {
             closestTarget = candidate;
         }
         return closestTarget;
+    }
+
+
+    public static void attemptSelfDefibrillator(ServerPlayer player) {
+        AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(player);
+        if (!(damageModel instanceof PlayerDamageModel playerDamageModel) || !playerDamageModel.canBeRescued()) {
+            return;
+        }
+        InteractionHand hand = InteractionHand.MAIN_HAND;
+        ItemStack stack = player.getItemInHand(hand);
+        if (!isDefibrillator(stack)) {
+            hand = InteractionHand.OFF_HAND;
+            stack = player.getItemInHand(hand);
+        }
+        if (!isDefibrillator(stack)) {
+            return;
+        }
+        EquipmentSlot equipmentSlot = getEquipmentSlot(hand);
+        stack.hurtAndBreak(1, player, living -> living.broadcastBreakEvent(equipmentSlot));
+        boolean rescued = playerDamageModel.defibrillatorRescueFromCriticalState(player, FirstAid.rescueWakeUpEnabled);
+        if (rescued) {
+            player.displayClientMessage(Component.translatable("firstaid.gui.self_defib_success").withStyle(ChatFormatting.GREEN), true);
+        }
     }
 
     private static InteractionSelection getInteractionSelection(Player player) {

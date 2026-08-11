@@ -61,6 +61,8 @@ public final class ClientEventHandler {
    private static ClientEventHandler.InteractionPrompt interactionPrompt;
    private static ClientEventHandler.PendingHealingSelection pendingHealingSelection;
    private static boolean requireUseReleaseBeforeHealingSelection;
+   private static boolean wasCriticalRescuable;
+   private static boolean wasLocalPlayerAlive = true;
 
    private ClientEventHandler() {
    }
@@ -130,7 +132,19 @@ public final class ClientEventHandler {
          }
 
          AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(mc.player);
+         boolean alive = mc.player.isAlive();
+         if (wasLocalPlayerAlive && !alive) {
+            hardStopFeedbackAudio(80);
+         }
+         wasLocalPlayerAlive = alive;
+
          if (damageModel instanceof PlayerDamageModel playerDamageModel) {
+            boolean canBeRescued = playerDamageModel.canBeRescued();
+            if (wasCriticalRescuable && !canBeRescued) {
+               hardStopFeedbackAudio(60);
+            }
+            wasCriticalRescuable = canBeRescued;
+
             updateGiveUpHoldState(mc, playerDamageModel);
             updatePendingHealingState(mc, damageModel);
             updateInteractionPromptState(mc);
@@ -198,6 +212,8 @@ public final class ClientEventHandler {
       HUDHandler.INSTANCE.ticker = -1;
       syncRetryTicks = 0;
       showedCriticalPrompt = false;
+      wasCriticalRescuable = false;
+      wasLocalPlayerAlive = true;
       resetGiveUpHoldState();
       resetInteractionPromptState();
       clearPendingHealingSelection();
@@ -210,9 +226,21 @@ public final class ClientEventHandler {
       PROJECTILE_NEAR_MISS_DETECTOR.clear();
    }
 
+   private static void hardStopFeedbackAudio(int muteTicks) {
+      HEARTBEAT_SOUND_CONTROLLER.clear();
+      SUPPRESSION_FEEDBACK_CONTROLLER.clear();
+      if (muteTicks > 0) {
+         HEARTBEAT_SOUND_CONTROLLER.beginMute(muteTicks);
+         SUPPRESSION_FEEDBACK_CONTROLLER.beginMute(muteTicks);
+      }
+   }
+
    private static void onLogin(Minecraft mc) {
       FirstAid.isSynced = false;
       syncRetryTicks = 20;
+      wasCriticalRescuable = false;
+      wasLocalPlayerAlive = true;
+      hardStopFeedbackAudio(80);
       resetGiveUpHoldState();
       resetInteractionPromptState();
       clearPendingHealingSelection();
@@ -440,6 +468,7 @@ public final class ClientEventHandler {
          return switch (interactionPrompt.type()) {
             case HEAL_SELF -> Component.translatable("firstaid.gui.healing_prompt_title").withStyle(ChatFormatting.AQUA);
             case USE_MEDICINE_SELF -> Component.translatable("firstaid.gui.medicine_prompt_title").withStyle(ChatFormatting.AQUA);
+            case SELF_DEFIB -> Component.translatable("firstaid.gui.self_defib_prompt_title").withStyle(ChatFormatting.GREEN);
             case RESCUE -> Component.translatable("firstaid.gui.rescue_prompt_title", new Object[]{interactionPrompt.targetName()}).withStyle(ChatFormatting.GREEN);
             case EXECUTE -> Component.translatable("firstaid.gui.execute_prompt_title", new Object[]{interactionPrompt.targetName()}).withStyle(ChatFormatting.RED);
             default -> Component.translatable(
@@ -471,6 +500,13 @@ public final class ClientEventHandler {
                   formatSingleDecimal(getInteractionHoldDurationSeconds())
                }
             ).withStyle(ChatFormatting.AQUA);
+            case SELF_DEFIB -> Component.translatable(
+               "firstaid.gui.self_defib_prompt_detail",
+               new Object[]{
+                  Component.translatable("key.use").withStyle(ChatFormatting.GOLD),
+                  formatSingleDecimal(getInteractionHoldDurationSeconds())
+               }
+            ).withStyle(ChatFormatting.GREEN);
             case RESCUE -> Component.translatable("firstaid.gui.rescue_prompt_crouch", new Object[]{formatSingleDecimal(getInteractionHoldDurationSeconds())})
                .withStyle(ChatFormatting.GREEN);
             case EXECUTE -> Component.translatable("firstaid.gui.execute_prompt_crouch", new Object[]{formatSingleDecimal(getInteractionHoldDurationSeconds())})
@@ -502,6 +538,10 @@ public final class ClientEventHandler {
                   formatSingleDecimal(getInteractionHoldDurationSeconds())
                }
             ).withStyle(ChatFormatting.AQUA);
+            case SELF_DEFIB -> Component.translatable(
+               "firstaid.gui.self_defib_progress",
+               new Object[]{formatSingleDecimal(getInteractionHoldSeconds(partialTick)), formatSingleDecimal(getInteractionHoldDurationSeconds())}
+            ).withStyle(ChatFormatting.AQUA);
             case RESCUE -> Component.translatable(
                "firstaid.gui.rescue_progress", new Object[]{formatSingleDecimal(getInteractionHoldSeconds(partialTick)), formatSingleDecimal(getInteractionHoldDurationSeconds())}
             ).withStyle(ChatFormatting.GREEN);
@@ -514,8 +554,14 @@ public final class ClientEventHandler {
    }
 
    public static boolean isRescueInteractionPrompt() {
-      return interactionPrompt != null && interactionPrompt.type() == ClientEventHandler.InteractionType.RESCUE;
+      return interactionPrompt != null
+         && (interactionPrompt.type() == ClientEventHandler.InteractionType.RESCUE
+            || interactionPrompt.type() == ClientEventHandler.InteractionType.SELF_DEFIB);
    }
+
+    public static boolean isSelfDefibInteractionPrompt() {
+       return interactionPrompt != null && interactionPrompt.type() == ClientEventHandler.InteractionType.SELF_DEFIB;
+    }
 
    public static boolean isExecutionInteractionPrompt() {
       return interactionPrompt != null && interactionPrompt.type() == ClientEventHandler.InteractionType.EXECUTE;
@@ -602,7 +648,8 @@ public final class ClientEventHandler {
       if (interactionPrompt != null && mc.gui.screen() == null && interactionPrompt.type() != ClientEventHandler.InteractionType.INVALID_ITEM && interactionPrompt.isSneaking()) {
          int holdDurationTicks = getCurrentInteractionHoldDurationTicks();
          interactionHoldTicks = Math.min(holdDurationTicks, interactionHoldTicks + 1);
-         if (interactionPrompt.type() == ClientEventHandler.InteractionType.RESCUE
+         if ((interactionPrompt.type() == ClientEventHandler.InteractionType.RESCUE
+               || interactionPrompt.type() == ClientEventHandler.InteractionType.SELF_DEFIB)
             && interactionHoldTicks >= RESCUE_SOUND_DELAY_TICKS
             && !interactionSoundTriggered
             && mc.player != null) {
@@ -614,6 +661,8 @@ public final class ClientEventHandler {
             interactionTriggered = true;
             if (interactionPrompt.type() == ClientEventHandler.InteractionType.RESCUE) {
                FirstAidClientNetworking.sendToServer(new MessageClientRequest(RequestType.ATTEMPT_RESCUE));
+            } else if (interactionPrompt.type() == ClientEventHandler.InteractionType.SELF_DEFIB) {
+               FirstAidClientNetworking.sendToServer(new MessageClientRequest(RequestType.ATTEMPT_SELF_DEFIB));
             } else if (interactionPrompt.type() == ClientEventHandler.InteractionType.EXECUTE) {
                FirstAidClientNetworking.sendToServer(new MessageClientRequest(RequestType.ATTEMPT_EXECUTION));
             }
@@ -644,6 +693,29 @@ public final class ClientEventHandler {
             getMedicineUseHand(mc.player),
             getMedicineUseDurationTicks(mc.player)
          );
+      }
+
+
+      // Self-defibrillator while critical-downed (issue #7).
+      if (mc.player != null && mc.level != null && mc.player.isAlive()
+         && CommonUtils.getExistingDamageModel(mc.player) instanceof PlayerDamageModel selfModel
+         && selfModel.canBeRescued()) {
+         InteractionHand defibHand = null;
+         if (isDefibrillator(mc.player.getMainHandItem())) {
+            defibHand = InteractionHand.MAIN_HAND;
+         } else if (isDefibrillator(mc.player.getOffhandItem())) {
+            defibHand = InteractionHand.OFF_HAND;
+         }
+         if (defibHand != null) {
+            return new ClientEventHandler.InteractionPrompt(
+               mc.player.getId(),
+               mc.player.getDisplayName().copy(),
+               ClientEventHandler.InteractionType.SELF_DEFIB,
+               mc.gui.screen() == null && mc.options.keyUse.isDown(),
+               defibHand,
+               DEFIBRILLATOR_RESCUE_HOLD_TICKS
+            );
+         }
       }
 
       if (mc.player != null && mc.level != null && mc.player.isAlive() && !isUnconscious(mc.player)) {
@@ -723,6 +795,7 @@ public final class ClientEventHandler {
    private static int getInteractionHoldDurationTicks(ItemStack stack, ClientEventHandler.InteractionType type) {
       return switch (type) {
          case RESCUE -> isDefibrillator(stack) ? DEFIBRILLATOR_RESCUE_HOLD_TICKS : RESCUE_HOLD_TICKS;
+         case SELF_DEFIB -> DEFIBRILLATOR_RESCUE_HOLD_TICKS;
          case EXECUTE -> EXECUTION_HOLD_TICKS;
          default -> 0;
       };
@@ -890,6 +963,7 @@ public final class ClientEventHandler {
       interactionHoldTicks = 0;
       interactionTriggered = false;
       interactionSoundTriggered = false;
+      HealingSoundController.stopRescueInteractionSound();
    }
 
    private static void clearPendingHealingSelection() {
@@ -929,6 +1003,7 @@ public final class ClientEventHandler {
    private static enum InteractionType {
       HEAL_SELF,
       USE_MEDICINE_SELF,
+      SELF_DEFIB,
       RESCUE,
       EXECUTE,
       INVALID_ITEM;

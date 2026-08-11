@@ -47,7 +47,7 @@ public class MessageClientRequest {
     }
 
     public enum Type {
-        TUTORIAL_COMPLETE, REQUEST_REFRESH, GIVE_UP, ATTEMPT_RESCUE, ATTEMPT_EXECUTION;
+        TUTORIAL_COMPLETE, REQUEST_REFRESH, GIVE_UP, ATTEMPT_RESCUE, ATTEMPT_EXECUTION, ATTEMPT_SELF_DEFIB;
 
         private static final Type[] TYPES = values();
     }
@@ -82,6 +82,8 @@ public class MessageClientRequest {
                 EventHandler.attemptImmediateRescue(player);
             } else if (message.type == Type.ATTEMPT_EXECUTION) {
                 EventHandler.attemptImmediateExecution(player);
+            } else if (message.type == MessageClientRequest.Type.ATTEMPT_SELF_DEFIB) {
+                EventHandler.attemptSelfDefibrillator(player);
             }
         }
     }

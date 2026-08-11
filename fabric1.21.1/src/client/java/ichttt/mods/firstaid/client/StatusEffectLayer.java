@@ -105,18 +105,37 @@ public class StatusEffectLayer implements HudRenderCallback {
                   guiGraphics.drawCenteredString(minecraft.font, title, centerX, centerY - 26, opaque(16773617));
                   guiGraphics.drawCenteredString(minecraft.font, timer, centerX, centerY - 10, opaque(13619151));
                   if (playerDamageModel != null && playerDamageModel.canGiveUp()) {
+                     int lineY = centerY + 2;
                      guiGraphics.drawCenteredString(
-                        minecraft.font, Component.translatable("firstaid.gui.waiting_for_rescue"), centerX, centerY + 2, opaque(15260121)
+                        minecraft.font, Component.translatable("firstaid.gui.waiting_for_rescue"), centerX, lineY, opaque(15260121)
                      );
-                     guiGraphics.drawCenteredString(minecraft.font, Component.translatable("firstaid.gui.rescue_help"), centerX, centerY + 14, opaque(14207690));
+                     lineY += 12;
+                     // Multi-line rescue help so defibrillator text stays readable.
+                     lineY = drawCenteredLines(
+                        guiGraphics,
+                        minecraft,
+                        new Component[]{
+                           Component.translatable("firstaid.gui.rescue_help.line1"),
+                           Component.translatable("firstaid.gui.rescue_help.line2")
+                        },
+                        centerX,
+                        lineY,
+                        opaque(14207690),
+                        11
+                     );
+                     lineY += 4;
+                     if (ClientEventHandler.isSelfDefibInteractionPrompt()) {
+                        lineY = renderSelfDefibProgress(guiGraphics, minecraft, centerX, lineY, partialTick);
+                        lineY += 6;
+                     }
                      guiGraphics.drawCenteredString(
                         minecraft.font,
                         Component.translatable("firstaid.gui.give_up_hint", new Object[]{ClientHooks.GIVE_UP.getTranslatedKeyMessage()}),
                         centerX,
-                        centerY + 28,
+                        lineY,
                         opaque(16757683)
                      );
-                     renderGiveUpProgress(guiGraphics, minecraft, centerX, centerY + 44, partialTick);
+                     renderGiveUpProgress(guiGraphics, minecraft, centerX, lineY + 14, partialTick);
                   }
                } else if (ClientEventHandler.hasInteractionPrompt()) {
                   renderRescuePrompt(guiGraphics, minecraft, width / 2, height / 2 + 24, deltaTracker.getGameTimeDeltaTicks());
@@ -196,22 +215,77 @@ public class StatusEffectLayer implements HudRenderCallback {
       );
    }
 
+   /**
+    * Electric cyan hold bar for self-defibrillator while downed.
+    * @return Y position after the progress label
+    */
+   private static int renderSelfDefibProgress(GuiGraphics guiGraphics, Minecraft minecraft, int centerX, int top, float partialTick) {
+      guiGraphics.drawCenteredString(
+         minecraft.font,
+         ClientEventHandler.getInteractionPromptTitle(),
+         centerX,
+         top,
+         opaque(0x55E0FF)
+      );
+      guiGraphics.drawCenteredString(
+         minecraft.font,
+         ClientEventHandler.getInteractionPromptDetail(),
+         centerX,
+         top + 11,
+         opaque(0x8FEFFF)
+      );
+      int barTop = top + 24;
+      int left = centerX - 72;
+      int right = left + 144;
+      int bottom = barTop + 8;
+      float progress = ClientEventHandler.getInteractionHoldProgress(partialTick);
+      int fillWidth = Math.round(142.0F * progress);
+      // Dark cyan frame, bright electric fill.
+      guiGraphics.fill(left, barTop, right, bottom, color(180, 6, 28, 36));
+      guiGraphics.fill(left + 1, barTop + 1, right - 1, bottom - 1, color(180, 10, 48, 58));
+      if (fillWidth > 0) {
+         guiGraphics.fill(left + 1, barTop + 1, left + 1 + fillWidth, bottom - 1, color(230, 64, 220, 255));
+      }
+      guiGraphics.drawCenteredString(
+         minecraft.font,
+         ClientEventHandler.getInteractionPromptProgressText(partialTick),
+         centerX,
+         barTop + 12,
+         opaque(0x9CF6FF)
+      );
+      return barTop + 24;
+   }
+
+   private static int drawCenteredLines(
+      GuiGraphics guiGraphics, Minecraft minecraft, Component[] lines, int centerX, int startY, int color, int lineHeight
+   ) {
+      int y = startY;
+      for (Component line : lines) {
+         guiGraphics.drawCenteredString(minecraft.font, line, centerX, y, color);
+         y += lineHeight;
+      }
+      return y;
+   }
+
    private static void renderRescuePrompt(GuiGraphics guiGraphics, Minecraft minecraft, int centerX, int centerY, float partialTick) {
       boolean healingPrompt = ClientEventHandler.isHealingInteractionPrompt();
       boolean executionPrompt = ClientEventHandler.isExecutionInteractionPrompt();
+      boolean selfDefibPrompt = ClientEventHandler.isSelfDefibInteractionPrompt();
+      int titleColor = healingPrompt ? opaque(7657471) : (executionPrompt ? opaque(16767436) : (selfDefibPrompt ? opaque(0x55E0FF) : opaque(15333346)));
+      int detailColor = healingPrompt ? opaque(10395294) : (executionPrompt ? opaque(15717458) : (selfDefibPrompt ? opaque(0x8FEFFF) : opaque(13624517)));
       guiGraphics.drawCenteredString(
          minecraft.font,
          ClientEventHandler.getInteractionPromptTitle(),
          centerX,
          centerY - 26,
-         healingPrompt ? opaque(7657471) : (executionPrompt ? opaque(16767436) : opaque(15333346))
+         titleColor
       );
       guiGraphics.drawCenteredString(
          minecraft.font,
          ClientEventHandler.getInteractionPromptDetail(),
          centerX,
          centerY - 12,
-         healingPrompt ? opaque(10395294) : (executionPrompt ? opaque(15717458) : opaque(13624517))
+         detailColor
       );
       if (ClientEventHandler.getInteractionHoldDurationSeconds() <= 0.0F) {
          return;
@@ -223,22 +297,14 @@ public class StatusEffectLayer implements HudRenderCallback {
       int bottom = top + 8;
       float progress = ClientEventHandler.getInteractionHoldProgress(partialTick);
       int fillWidth = Math.round(142.0F * progress);
-      guiGraphics.fill(left, top, right, bottom, healingPrompt ? color(180, 8, 28, 36) : (executionPrompt ? color(180, 48, 8, 8) : color(180, 10, 38, 14)));
-      guiGraphics.fill(
-         left + 1,
-         top + 1,
-         right - 1,
-         bottom - 1,
-         healingPrompt ? color(180, 12, 54, 66) : (executionPrompt ? color(180, 82, 18, 18) : color(180, 24, 74, 28))
-      );
+      int frameOuter = healingPrompt ? color(180, 8, 28, 36) : (executionPrompt ? color(180, 48, 8, 8) : (selfDefibPrompt ? color(180, 6, 28, 36) : color(180, 10, 38, 14)));
+      int frameInner = healingPrompt ? color(180, 12, 54, 66) : (executionPrompt ? color(180, 82, 18, 18) : (selfDefibPrompt ? color(180, 10, 48, 58) : color(180, 24, 74, 28)));
+      int fill = healingPrompt ? color(220, 88, 224, 210) : (executionPrompt ? color(220, 232, 70, 70) : (selfDefibPrompt ? color(230, 64, 220, 255) : color(220, 126, 214, 110)));
+      int labelColor = healingPrompt ? opaque(11460492) : (executionPrompt ? opaque(16760992) : (selfDefibPrompt ? opaque(0x9CF6FF) : opaque(14217424)));
+      guiGraphics.fill(left, top, right, bottom, frameOuter);
+      guiGraphics.fill(left + 1, top + 1, right - 1, bottom - 1, frameInner);
       if (fillWidth > 0) {
-         guiGraphics.fill(
-            left + 1,
-            top + 1,
-            left + 1 + fillWidth,
-            bottom - 1,
-            healingPrompt ? color(220, 88, 224, 210) : (executionPrompt ? color(220, 232, 70, 70) : color(220, 126, 214, 110))
-         );
+         guiGraphics.fill(left + 1, top + 1, left + 1 + fillWidth, bottom - 1, fill);
       }
 
       guiGraphics.drawCenteredString(
@@ -246,7 +312,7 @@ public class StatusEffectLayer implements HudRenderCallback {
          ClientEventHandler.getInteractionPromptProgressText(partialTick),
          centerX,
          top + 12,
-         healingPrompt ? opaque(11460492) : (executionPrompt ? opaque(16760992) : opaque(14217424))
+         labelColor
       );
    }
 

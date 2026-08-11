@@ -86,11 +86,14 @@ public final class SuppressionFeedbackController {
    private float pitchImpulse;
    private float fovImpulse;
    private long soundCooldownUntilGameTime;
-   private int lastPainLevel;
-   private float lastAcutePain;
+   private int lastTinnitusCueId;
+   private boolean wasOverpowerSuppression;
    private int hallucinationCooldownTicks;
+   private int localMuteTicks;
    @Nullable
    private Level trackedLevel;
+   @Nullable
+   private SoundInstance activeTinnitusSound;
 
    public void tick(Minecraft client) {
       Player player = client.player;
@@ -100,15 +103,17 @@ public final class SuppressionFeedbackController {
             this.clear(level);
             this.trackedLevel = level;
          }
+         if (this.localMuteTicks > 0) {
+            --this.localMuteTicks;
+         }
 
          PlayerDamageModel playerDamageModel = CommonUtils.getDamageModel(player) instanceof PlayerDamageModel model ? model : null;
-         int painLevel = playerDamageModel == null ? 0 : playerDamageModel.getPainLevel();
-        float acutePain = playerDamageModel == null ? 0.0F : playerDamageModel.getAcutePainIntensity();
          float suppressionScale = FirstAid.lowSuppressionEnabled ? FirstAid.lowSuppressionMultiplier : 1.0F;
          this.suppressionIntensity = (playerDamageModel == null ? 0.0F : playerDamageModel.getSuppressionIntensity()) * suppressionScale;
          this.holdTicks = playerDamageModel == null ? 0 : playerDamageModel.getSuppressionHoldTicks();
          boolean withdrawalActive = playerDamageModel != null && playerDamageModel.isWithdrawalEpisodeActive();
          float addictionNorm = playerDamageModel == null ? 0.0F : playerDamageModel.getAddictionNormalized();
+         boolean audioMuted = this.localMuteTicks > 0 || (playerDamageModel != null && playerDamageModel.isAudioMuted());
          boolean painSuppressed = player.hasEffect(RegistryObjects.PAINKILLER_EFFECT)
             || player.hasEffect(RegistryObjects.MORPHINE_EFFECT);
          float targetPainFov = 0.0F;
@@ -127,15 +132,18 @@ public final class SuppressionFeedbackController {
          if (withdrawalActive && addictionNorm >= 0.35F) {
             targetMusicDetune = 0.22F + (addictionNorm - 0.35F) / 0.65F * 0.55F;
          }
-         float targetTinnitus = holding ? Math.max(0.48F, this.suppressionIntensity * 0.64F) : this.suppressionIntensity * 0.42F;
-        if (withdrawalActive) {
-            targetTinnitus = Math.max(targetTinnitus, 0.18F + addictionNorm * 0.40F);
-        }
+         float targetTinnitus = 0.0F;
+         if (!audioMuted && this.suppressionIntensity >= 0.85F) {
+            targetTinnitus = 0.22F + (this.suppressionIntensity - 0.85F) / 0.15F * 0.35F;
+         }
+         if (withdrawalActive && !audioMuted) {
+            targetTinnitus = Math.max(targetTinnitus, 0.10F + addictionNorm * 0.22F);
+         }
          float targetShake = holding ? 0.12F + this.suppressionIntensity * 0.18F : this.suppressionIntensity * 0.10F;
          float targetFovCompression = holding ? 1.2F + this.suppressionIntensity * 2.0F : this.suppressionIntensity * 1.0F;
          this.audioMuffleStrength = approach(this.audioMuffleStrength, targetMuffle, targetMuffle > this.audioMuffleStrength ? 0.18F : 0.020F);
          this.musicDetuneStrength = approach(this.musicDetuneStrength, targetMusicDetune, targetMusicDetune > this.musicDetuneStrength ? 0.10F : 0.03F);
-         this.tinnitusStrength = approach(this.tinnitusStrength, targetTinnitus, targetTinnitus > this.tinnitusStrength ? 0.12F : 0.02F);
+         this.tinnitusStrength = approach(this.tinnitusStrength, targetTinnitus, targetTinnitus > this.tinnitusStrength ? 0.14F : 0.06F);
          this.shakeStrength = approach(this.shakeStrength, targetShake, targetShake > this.shakeStrength ? 0.1F : 0.015F);
          this.sustainedFovCompression = approach(
             this.sustainedFovCompression, targetFovCompression, targetFovCompression > this.sustainedFovCompression ? 0.16F : 0.03F
@@ -145,25 +153,22 @@ public final class SuppressionFeedbackController {
          this.yawImpulse *= 0.85F;
          this.pitchImpulse *= 0.85F;
          this.fovImpulse *= holding ? 0.93F : 0.83F;
-         if ((Boolean)FirstAidConfig.CLIENT.enableSounds.get() && level.getGameTime() >= this.soundCooldownUntilGameTime) {
-            if (this.suppressionIntensity >= 0.42F) {
-               this.soundCooldownUntilGameTime = level.getGameTime() + 36L;
-               this.playTinnitusSound(0.38F + this.suppressionIntensity * 0.40F);
-            } else if (FirstAid.enablePainAudioEffects && painLevel >= 4 && this.lastPainLevel < 4) {
-               this.soundCooldownUntilGameTime = level.getGameTime() + 60L;
-               this.playTinnitusSound(0.52F + 0.12F * Math.min(2, painLevel - 4));
-            } else if (FirstAid.enablePainAudioEffects
-               && acutePain >= ACUTE_TINNITUS_THRESHOLD
-               && this.lastAcutePain < ACUTE_TINNITUS_THRESHOLD) {
-               this.soundCooldownUntilGameTime = level.getGameTime() + 60L;
-               this.playTinnitusSound(0.48F + 0.18F * Mth.clamp(acutePain - ACUTE_TINNITUS_THRESHOLD, 0.0F, 1.0F));
+         if (!audioMuted && (Boolean)FirstAidConfig.CLIENT.enableSounds.get() && FirstAid.enablePainAudioEffects) {
+            int cueId = playerDamageModel == null ? 0 : playerDamageModel.getTinnitusCueId();
+            float cueSeverity = playerDamageModel == null ? 0.0F : playerDamageModel.getTinnitusCueSeverity();
+            if (cueId > 0 && cueId != this.lastTinnitusCueId && cueSeverity > 0.01F) {
+               this.lastTinnitusCueId = cueId;
+               this.playTinnitusSound(cueSeverity);
             }
+            boolean overpower = this.suppressionIntensity >= 0.85F;
+            if (overpower && !this.wasOverpowerSuppression && level.getGameTime() >= this.soundCooldownUntilGameTime) {
+               this.soundCooldownUntilGameTime = level.getGameTime() + 100L;
+               this.playTinnitusSound(0.28F + (this.suppressionIntensity - 0.85F) * 0.35F);
+            }
+            this.wasOverpowerSuppression = overpower;
          }
 
          this.tickWithdrawalHallucinations(player, level, withdrawalActive, addictionNorm);
-
-         this.lastPainLevel = painLevel;
-         this.lastAcutePain = acutePain;
       } else {
          this.clear(level);
       }
@@ -203,19 +208,19 @@ public final class SuppressionFeedbackController {
       return this.sustainedFovCompression;
    }
 
+   public void beginMute(int ticks) {
+      this.localMuteTicks = Math.max(this.localMuteTicks, Math.max(0, ticks));
+      this.stopActiveTinnitusSound();
+      this.tinnitusStrength = 0.0F;
+   }
+
    public void onNearMiss(Player player, float severity, float lateralSign, float verticalSign) {
+      // Visual/camera feedback only — near-miss no longer rings ears (issue #7).
       this.shakeStrength = Math.max(this.shakeStrength, 0.34F + severity * 0.34F);
       this.rollImpulse += lateralSign * (1.2F + severity * 2.0F);
       this.yawImpulse += lateralSign * (0.35F + severity * 0.75F);
       this.pitchImpulse += verticalSign * (0.18F + severity * 0.42F);
       this.fovImpulse += 2.0F + severity * 4.2F;
-      if ((Boolean)FirstAidConfig.CLIENT.enableSounds.get()) {
-         Level level = player.level();
-         if (level.getGameTime() >= this.soundCooldownUntilGameTime) {
-            this.soundCooldownUntilGameTime = level.getGameTime() + Mth.ceil(8.0F + (1.0F - severity) * 12.0F);
-            this.playTinnitusSound(severity);
-         }
-      }
    }
 
    public SuppressionFeedbackController.CameraAngles applyCameraAngles(@Nullable Entity entity, float partialTick, float yaw, float pitch) {
@@ -278,9 +283,21 @@ public final class SuppressionFeedbackController {
       Minecraft client = Minecraft.getInstance();
       SoundManager soundManager = client.getSoundManager();
       SoundEvent tinnitus = (SoundEvent)BuiltInRegistries.SOUND_EVENT.getValue(TINNITUS_SOUND);
-      if (tinnitus != null) {
-         soundManager.play(SimpleSoundInstance.forUI(tinnitus, 0.18F + severity * 0.28F, 0.96F + severity * 0.08F));
+      if (tinnitus == null) {
+         return;
       }
+      this.stopActiveTinnitusSound();
+      SimpleSoundInstance instance = SimpleSoundInstance.forUI(tinnitus, 0.14F + severity * 0.22F, 0.96F + severity * 0.08F);
+      this.activeTinnitusSound = instance;
+      soundManager.play(instance);
+   }
+
+   private void stopActiveTinnitusSound() {
+      if (this.activeTinnitusSound == null) {
+         return;
+      }
+      Minecraft.getInstance().getSoundManager().stop(this.activeTinnitusSound);
+      this.activeTinnitusSound = null;
    }
 
    private void tickWithdrawalHallucinations(Player player, Level level, boolean withdrawalActive, float addictionNorm) {
@@ -336,6 +353,7 @@ public final class SuppressionFeedbackController {
    }
 
    private void clear(@Nullable Level level) {
+      this.stopActiveTinnitusSound();
       this.trackedLevel = level;
       this.suppressionIntensity = 0.0F;
       this.holdTicks = 0;
@@ -350,7 +368,9 @@ public final class SuppressionFeedbackController {
       this.pitchImpulse = 0.0F;
       this.fovImpulse = 0.0F;
       this.soundCooldownUntilGameTime = 0L;
-      this.lastPainLevel = 0;
+      this.lastTinnitusCueId = 0;
+      this.wasOverpowerSuppression = false;
+      this.localMuteTicks = 0;
       this.hallucinationCooldownTicks = 0;
    }
 

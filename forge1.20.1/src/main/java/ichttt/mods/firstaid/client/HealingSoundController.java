@@ -24,6 +24,7 @@ import ichttt.mods.firstaid.api.medicine.ItemMedicine;
 import ichttt.mods.firstaid.common.RegistryObjects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.TickableSoundInstance;
@@ -44,6 +45,8 @@ public final class HealingSoundController {
     private static @Nullable ResourceLocation activeMedicineStartSound;
     private static @Nullable ItemStack activeMedicineStack;
     private static @Nullable ItemUseSound activeMedicineLoopSound;
+    private static @Nullable SoundInstance activeRescueSound;
+    private static @Nullable ResourceLocation activeRescueSoundLocation;
 
     private HealingSoundController() {
     }
@@ -54,6 +57,7 @@ public final class HealingSoundController {
             stopPillsSound(soundManager);
             stopMedicineSounds(soundManager);
             stopHealingSound(soundManager);
+            stopRescueInteractionSound(soundManager);
             return;
         }
 
@@ -95,9 +99,11 @@ public final class HealingSoundController {
     }
 
     public static void clear() {
-        stopPillsSound(Minecraft.getInstance().getSoundManager());
-        stopMedicineSounds(Minecraft.getInstance().getSoundManager());
-        stopHealingSound(Minecraft.getInstance().getSoundManager());
+        SoundManager soundManager = Minecraft.getInstance().getSoundManager();
+        stopPillsSound(soundManager);
+        stopMedicineSounds(soundManager);
+        stopHealingSound(soundManager);
+        stopRescueInteractionSound(soundManager);
     }
 
     public static void playHealingApplySound(ItemStack stack) {
@@ -113,16 +119,37 @@ public final class HealingSoundController {
     }
 
     public static void playRescueInteractionSound(ItemStack stack) {
-        Minecraft minecraft = Minecraft.getInstance();
-        LocalPlayer player = minecraft.player;
-        if (!FirstAidConfig.CLIENT.enableSounds.get() || player == null) {
-            return;
-        }
+       Minecraft minecraft = Minecraft.getInstance();
+       LocalPlayer player = minecraft.player;
+       SoundManager soundManager = minecraft.getSoundManager();
+       if (!FirstAidConfig.CLIENT.enableSounds.get() || player == null) {
+          return;
+       }
 
-        SoundEvent soundEvent = stack.is(RegistryObjects.DEFIBRILLATOR.get())
-                ? RegistryObjects.DEFIBRILLATOR_USE.get()
-                : RegistryObjects.BANDAGE_USE.get();
-        player.playSound(soundEvent, 1.0F, 1.0F);
+       SoundEvent soundEvent = stack.is((Item)RegistryObjects.DEFIBRILLATOR.get())
+          ? (SoundEvent)RegistryObjects.DEFIBRILLATOR_USE.get()
+          : (SoundEvent)RegistryObjects.BANDAGE_USE.get();
+       // Tracked instance so releasing the hold can hard-stop mid-clip.
+       stopRescueInteractionSound(soundManager);
+       SimpleSoundInstance instance = SimpleSoundInstance.forUI(soundEvent, 1.0F, 1.0F);
+       activeRescueSound = instance;
+       activeRescueSoundLocation = soundEvent.getLocation();
+       soundManager.play(instance);
+    }
+
+    public static void stopRescueInteractionSound() {
+       stopRescueInteractionSound(Minecraft.getInstance().getSoundManager());
+    }
+
+    private static void stopRescueInteractionSound(SoundManager soundManager) {
+       if (activeRescueSound != null) {
+          soundManager.stop(activeRescueSound);
+          activeRescueSound = null;
+       }
+       if (activeRescueSoundLocation != null) {
+          soundManager.stop(activeRescueSoundLocation, SoundSource.PLAYERS);
+          activeRescueSoundLocation = null;
+       }
     }
 
     private static void updateMedicineSounds(SoundManager soundManager, LocalPlayer player) {

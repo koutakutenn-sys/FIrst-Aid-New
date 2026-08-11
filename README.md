@@ -43,8 +43,9 @@ Full notes: [1.3.0changelog.md](./1.3.0changelog.md)
 - **Locational health** — head, body, arms, legs, feet; each with its own pool and overflow rules  
 - **Injury debuffs** — limb damage that changes how you move, dig, and fight  
 - **Medicine with pacing** — bandages, plaster, painkillers, morphine, injectors; activation delay and heal-over-time  
-- **Unconsciousness & rescue** — critical downs, give-up flow, revive windows  
-- **Suppression** — projectile near-miss pressure: desaturation, blur, vignette, optional tinnitus  
+- **Unconsciousness & rescue** — critical downs, give-up flow, revive windows; **self-revive with a defibrillator** while downed  
+- **Suppression** — projectile near-miss pressure: desaturation, blur, vignette; tinnitus only on overpower pressure, head trauma, strong shocks, or explosions  
+
 - **Opioid addiction** — hidden addiction value, withdrawal episodes, status icons  
 - **Client feedback** — pain blur, hit red pulse, morphine color grade, adrenaline rush blur, heartbeat audio  
 - **Public extension API** — third-party treatment items and medicines  

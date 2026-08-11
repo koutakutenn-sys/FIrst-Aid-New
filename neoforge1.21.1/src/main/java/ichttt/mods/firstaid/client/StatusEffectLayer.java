@@ -151,10 +151,20 @@ public class StatusEffectLayer implements LayeredDraw.Layer {
             guiGraphics.drawCenteredString(minecraft.font, title, centerX, centerY - 26, opaque(0xFFF1F1));
             guiGraphics.drawCenteredString(minecraft.font, timer, centerX, centerY - 10, opaque(0xCFCFCF));
             if (playerDamageModel != null && playerDamageModel.canGiveUp()) {
-                guiGraphics.drawCenteredString(minecraft.font, Component.translatable("firstaid.gui.waiting_for_rescue"), centerX, centerY + 2, opaque(0xE8D9D9));
-                guiGraphics.drawCenteredString(minecraft.font, Component.translatable("firstaid.gui.rescue_help"), centerX, centerY + 14, opaque(0xD8CACA));
-                guiGraphics.drawCenteredString(minecraft.font, Component.translatable("firstaid.gui.give_up_hint", ClientHooks.GIVE_UP.getTranslatedKeyMessage()), centerX, centerY + 28, opaque(0xFFB3B3));
-                renderGiveUpProgress(guiGraphics, minecraft, centerX, centerY + 44, partialTick);
+                int lineY = centerY + 2;
+                guiGraphics.drawCenteredString(minecraft.font, Component.translatable("firstaid.gui.waiting_for_rescue"), centerX, lineY, opaque(0xE8D9D9));
+                lineY += 12;
+                lineY = drawCenteredLines(guiGraphics, minecraft, new Component[]{
+                        Component.translatable("firstaid.gui.rescue_help.line1"),
+                        Component.translatable("firstaid.gui.rescue_help.line2")
+                }, centerX, lineY, opaque(0xD8CACA), 11);
+                lineY += 4;
+                if (ClientEventHandler.isSelfDefibInteractionPrompt()) {
+                    lineY = renderSelfDefibProgress(guiGraphics, minecraft, centerX, lineY, partialTick);
+                    lineY += 6;
+                }
+                guiGraphics.drawCenteredString(minecraft.font, Component.translatable("firstaid.gui.give_up_hint", ClientHooks.GIVE_UP.getTranslatedKeyMessage()), centerX, lineY, opaque(0xFFB3B3));
+                renderGiveUpProgress(guiGraphics, minecraft, centerX, lineY + 14, partialTick);
             }
         } else if (ClientEventHandler.hasInteractionPrompt()) {
             renderRescuePrompt(guiGraphics, minecraft, width / 2, height / 2 + 24, deltaTracker.getGameTimeDeltaTicks());
@@ -207,7 +217,34 @@ public class StatusEffectLayer implements LayeredDraw.Layer {
         renderVignette(guiGraphics, width, height, 160, 10, 10, 0.18F + intensity * 0.82F, 28);
     }
 
-    private static void renderGiveUpProgress(GuiGraphics guiGraphics, Minecraft minecraft, int centerX, int top, float partialTick) {
+        private static int renderSelfDefibProgress(GuiGraphics guiGraphics, Minecraft minecraft, int centerX, int top, float partialTick) {
+        guiGraphics.drawCenteredString(minecraft.font, ClientEventHandler.getInteractionPromptTitle(), centerX, top, opaque(0x55E0FF));
+        guiGraphics.drawCenteredString(minecraft.font, ClientEventHandler.getInteractionPromptDetail(), centerX, top + 11, opaque(0x8FEFFF));
+        int barTop = top + 24;
+        int left = centerX - 72;
+        int right = left + 144;
+        int bottom = barTop + 8;
+        float progress = ClientEventHandler.getInteractionHoldProgress(partialTick);
+        int fillWidth = Math.round(142.0F * progress);
+        guiGraphics.fill(left, barTop, right, bottom, color(180, 6, 28, 36));
+        guiGraphics.fill(left + 1, barTop + 1, right - 1, bottom - 1, color(180, 10, 48, 58));
+        if (fillWidth > 0) {
+            guiGraphics.fill(left + 1, barTop + 1, left + 1 + fillWidth, bottom - 1, color(230, 64, 220, 255));
+        }
+        guiGraphics.drawCenteredString(minecraft.font, ClientEventHandler.getInteractionPromptProgressText(partialTick), centerX, barTop + 12, opaque(0x9CF6FF));
+        return barTop + 24;
+    }
+
+    private static int drawCenteredLines(GuiGraphics guiGraphics, Minecraft minecraft, Component[] lines, int centerX, int startY, int color, int lineHeight) {
+        int y = startY;
+        for (Component line : lines) {
+            guiGraphics.drawCenteredString(minecraft.font, line, centerX, y, color);
+            y += lineHeight;
+        }
+        return y;
+    }
+
+   private static void renderGiveUpProgress(GuiGraphics guiGraphics, Minecraft minecraft, int centerX, int top, float partialTick) {
         int left = centerX - GIVE_UP_BAR_WIDTH / 2;
         int right = left + GIVE_UP_BAR_WIDTH;
         int bottom = top + GIVE_UP_BAR_HEIGHT;

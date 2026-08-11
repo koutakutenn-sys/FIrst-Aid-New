@@ -227,6 +227,11 @@ implements LookupReloadListener {
     private int withdrawalCheckTicks = 0;
     private int addictionPulseType = 0;
     private int addictionPulseTicks = 0;
+    /** Monotonic cue id so clients play tinnitus once per event. */
+    private int tinnitusCueId = 0;
+    private float tinnitusCueSeverity = 0.0f;
+    /** After rescue/respawn, suppress feedback audio until this reaches 0. */
+    private int audioMuteTicks = 0;
 
     public PlayerDamageModel() {
         super(new DamageablePart(FirstAidConfig.SERVER.maxHealthHead.get(), FirstAidConfig.SERVER.causeDeathHead.get(), EnumPlayerPart.HEAD), new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftArm.get(), false, EnumPlayerPart.LEFT_ARM), new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftLeg.get(), false, EnumPlayerPart.LEFT_LEG), new DamageablePart(FirstAidConfig.SERVER.maxHealthLeftFoot.get(), false, EnumPlayerPart.LEFT_FOOT), new DamageablePart(FirstAidConfig.SERVER.maxHealthBody.get(), FirstAidConfig.SERVER.causeDeathBody.get(), EnumPlayerPart.BODY), new DamageablePart(FirstAidConfig.SERVER.maxHealthRightArm.get(), false, EnumPlayerPart.RIGHT_ARM), new DamageablePart(FirstAidConfig.SERVER.maxHealthRightLeg.get(), false, EnumPlayerPart.RIGHT_LEG), new DamageablePart(FirstAidConfig.SERVER.maxHealthRightFoot.get(), false, EnumPlayerPart.RIGHT_FOOT));
@@ -277,6 +282,9 @@ implements LookupReloadListener {
         tagCompound.putInt("withdrawalCheckTicks", this.withdrawalCheckTicks);
         tagCompound.putInt("addictionPulseType", this.addictionPulseType);
         tagCompound.putInt("addictionPulseTicks", this.addictionPulseTicks);
+        tagCompound.putInt("tinnitusCueId", this.tinnitusCueId);
+        tagCompound.putFloat("tinnitusCueSeverity", this.tinnitusCueSeverity);
+        tagCompound.putInt("audioMuteTicks", this.audioMuteTicks);
         if (!this.unconsciousReasonKey.isEmpty()) {
             tagCompound.putString("unconsciousReasonKey", this.unconsciousReasonKey);
         }
@@ -342,6 +350,9 @@ implements LookupReloadListener {
         }
         this.addictionPulseType = nbt.getIntOr("addictionPulseType", 0);
         this.addictionPulseTicks = nbt.getIntOr("addictionPulseTicks", 0);
+        this.tinnitusCueId = Math.max(0, nbt.getIntOr("tinnitusCueId", 0));
+        this.tinnitusCueSeverity = Mth.clamp(nbt.getFloatOr("tinnitusCueSeverity", 0.0f), 0.0f, 1.0f);
+        this.audioMuteTicks = Math.max(0, nbt.getIntOr("audioMuteTicks", 0));
         this.collapsePlacementPending = false;
         this.refreshSuppressionSnapshot();
     }
@@ -941,6 +952,9 @@ implements LookupReloadListener {
         this.withdrawalCooldownTicks = 0;
         this.addictionPulseType = 0;
         this.addictionPulseTicks = 0;
+        this.tinnitusCueId = 0;
+        this.tinnitusCueSeverity = 0.0f;
+        this.audioMuteTicks = 0;
     }
 
     public void markExternalRevivePending(Player player) {
@@ -1008,6 +1022,8 @@ implements LookupReloadListener {
         this.criticalConditionActive = false;
         this.painLevel = Math.max(2, this.painLevel);
         this.chronicPainIntensity = Math.max(this.chronicPainIntensity, 0.22f);
+        // Clear sticky feedback so revival does not keep ringing ears / heartbeat.
+        this.clearStickyFeedbackAfterRescue();
         if (keepWakeUpDelay) {
             AbstractDamageablePart rescueTarget = this.getFirstCriticalRescueTarget();
             if (healer != null && rescueTarget != null && rescueTarget.activeHealer == null) {
@@ -1025,6 +1041,84 @@ implements LookupReloadListener {
             FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
         }
         return true;
+    }
+
+
+    /**
+     * Clears residual suppression/acute audio drivers and starts a short mute window after rescue.
+     */
+    private void clearStickyFeedbackAfterRescue() {
+        this.suppressionIntensity = 0.0f;
+        this.suppressionHoldTicks = 0;
+        this.suppressionDecayTicker = 0;
+        this.refreshSuppressionSnapshot();
+        this.acutePainIntensity = Math.min(this.acutePainIntensity, 0.35f);
+        this.tinnitusCueSeverity = 0.0f;
+        this.beginAudioMute(60);
+    }
+
+    public void registerTinnitusCue(float severity) {
+        float clamped = Mth.clamp(severity, 0.0f, 1.0f);
+        if (clamped <= 0.01f || this.audioMuteTicks > 0) {
+            return;
+        }
+        ++this.tinnitusCueId;
+        this.tinnitusCueSeverity = Math.max(this.tinnitusCueSeverity, clamped);
+        this.scheduleResync();
+    }
+
+    public int getTinnitusCueId() {
+        return this.tinnitusCueId;
+    }
+
+    public float getTinnitusCueSeverity() {
+        return this.tinnitusCueSeverity;
+    }
+
+    public void beginAudioMute(int ticks) {
+        this.audioMuteTicks = Math.max(this.audioMuteTicks, Math.max(0, ticks));
+    }
+
+    public int getAudioMuteTicks() {
+        return this.audioMuteTicks;
+    }
+
+    public boolean isAudioMuted() {
+        return this.audioMuteTicks > 0;
+    }
+
+    /**
+     * After damage is applied, register tinnitus only for explosions, head trauma, or very strong shocks.
+     */
+    public void registerDamageFeedback(Player player, DamageSource source, AbstractPlayerDamageModel before) {
+        if (player.level().isClientSide() || before == null || this.audioMuteTicks > 0) {
+            return;
+        }
+        float headLost = Math.max(0.0f, before.HEAD.currentHealth - this.HEAD.currentHealth);
+        float totalLost = 0.0f;
+        for (AbstractDamageablePart part : this) {
+            AbstractDamageablePart previous = before.getFromEnum(part.part);
+            if (previous != null) {
+                totalLost += Math.max(0.0f, previous.currentHealth - part.currentHealth);
+            }
+        }
+        if (totalLost <= 0.05f) {
+            return;
+        }
+        boolean explosion = source.is(net.minecraft.tags.DamageTypeTags.IS_EXPLOSION);
+        if (explosion) {
+            this.registerTinnitusCue(Mth.clamp(0.55f + totalLost * 0.10f, 0.55f, 1.0f));
+            return;
+        }
+        // Meaningful direct head trauma (at least ~0.5 hearts).
+        if (headLost >= 1.0f) {
+            this.registerTinnitusCue(Mth.clamp(0.48f + headLost * 0.12f, 0.48f, 1.0f));
+            return;
+        }
+        // Sudden strong full-body shock (~3+ hearts in one hit).
+        if (totalLost >= 6.0f) {
+            this.registerTinnitusCue(Mth.clamp(0.52f + (totalLost - 6.0f) * 0.04f, 0.52f, 1.0f));
+        }
     }
 
     private int getScaledRescueWakeUpDelayTicks(float multiplier) {
@@ -1438,9 +1532,13 @@ implements LookupReloadListener {
         }
         float previousAcute = this.acutePainIntensity;
         int previousRush = this.morphineRushTicks;
+        int previousAudioMute = this.audioMuteTicks;
         this.trackInjuryDeltaForAcutePain(player);
         this.tickAcutePainState(player);
         this.tickMorphineRush();
+        if (this.audioMuteTicks > 0) {
+            --this.audioMuteTicks;
+        }
         this.painLevel = this.calculatePainLevel();
         this.tickAddictionState(player);
         if (this.isWithdrawalEpisodeActive()) {
@@ -1480,7 +1578,8 @@ implements LookupReloadListener {
             || previousDeathState != this.unconsciousCausesDeath
             || !Objects.equals(previousUnconsciousReasonKey, this.unconsciousReasonKey)
             || Float.compare(previousAcute, this.acutePainIntensity) != 0
-            || previousRush != this.morphineRushTicks) {
+            || previousRush != this.morphineRushTicks
+            || previousAudioMute != this.audioMuteTicks) {
             this.scheduleResync();
         }
         if (this.painLevel == 0 && this.adrenalineTicks == 0 && this.unconsciousTicks == 0 && !this.isPainSuppressed(player)) {

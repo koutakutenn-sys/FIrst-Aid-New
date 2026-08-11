@@ -51,7 +51,7 @@ public class MessageClientRequest implements CustomPacketPayload {
     }
 
     public enum RequestType {
-        TUTORIAL_COMPLETE, REQUEST_REFRESH, GIVE_UP, ATTEMPT_RESCUE, ATTEMPT_EXECUTION;
+        TUTORIAL_COMPLETE, REQUEST_REFRESH, GIVE_UP, ATTEMPT_RESCUE, ATTEMPT_EXECUTION, ATTEMPT_SELF_DEFIB;
 
         private static final RequestType[] TYPES = values();
     }
@@ -79,6 +79,8 @@ public class MessageClientRequest implements CustomPacketPayload {
                 EventHandler.attemptImmediateRescue(player);
             } else if (message.type == RequestType.ATTEMPT_EXECUTION) {
                 EventHandler.attemptImmediateExecution(player);
+            } else if (message.type == RequestType.ATTEMPT_SELF_DEFIB) {
+                EventHandler.attemptSelfDefibrillator(player);
             }
         });
     }

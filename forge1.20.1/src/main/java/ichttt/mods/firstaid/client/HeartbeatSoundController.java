@@ -44,10 +44,12 @@ public final class HeartbeatSoundController {
     private static final int ACTIVE_HOLD_TICKS = 2;
     private static final int PULSE_HOLD_TICKS = 2;
     private static final float RED_HEALTH_THRESHOLD = 0.25F;
-    private static final float ACTIVE_SUPPRESSION_THRESHOLD = 0.01F;
+    /** Ignore tiny residual suppression after rescue (issue #7). */
+    private static final float ACTIVE_SUPPRESSION_THRESHOLD = 0.12F;
 
     private @Nullable HeartbeatLoopSound activeHeartbeat;
     private int lastAdrenalineHeartbeatTriggerId = -1;
+    private int localMuteTicks;
 
     public void tick(Minecraft minecraft) {
         LocalPlayer player = minecraft.player;
@@ -56,7 +58,29 @@ public final class HeartbeatSoundController {
             return;
         }
 
+        if (localMuteTicks > 0) {
+            --localMuteTicks;
+            if (activeHeartbeat != null) {
+                activeHeartbeat.stopImmediately();
+                minecraft.getSoundManager().stop(activeHeartbeat);
+                activeHeartbeat = null;
+            }
+            PlayerDamageModel mutedModel = CommonUtils.getDamageModel(player) instanceof PlayerDamageModel model ? model : null;
+            lastAdrenalineHeartbeatTriggerId = mutedModel == null ? -1 : mutedModel.getAdrenalineHeartbeatTriggerId();
+            return;
+        }
+
         PlayerDamageModel playerDamageModel = CommonUtils.getDamageModel(player) instanceof PlayerDamageModel model ? model : null;
+        if (playerDamageModel != null && playerDamageModel.isAudioMuted()) {
+            if (activeHeartbeat != null) {
+                activeHeartbeat.stopImmediately();
+                minecraft.getSoundManager().stop(activeHeartbeat);
+                activeHeartbeat = null;
+            }
+            lastAdrenalineHeartbeatTriggerId = playerDamageModel.getAdrenalineHeartbeatTriggerId();
+            return;
+        }
+
         boolean sustainedHeartbeat = playerDamageModel != null && (isCriticalPartRed(playerDamageModel) || isSuppressed(playerDamageModel));
         int triggerId = playerDamageModel == null ? -1 : playerDamageModel.getAdrenalineHeartbeatTriggerId();
         boolean pulseHeartbeat = triggerId != -1 && triggerId != lastAdrenalineHeartbeatTriggerId;
@@ -81,6 +105,15 @@ public final class HeartbeatSoundController {
         }
     }
 
+    public void beginMute(int ticks) {
+        localMuteTicks = Math.max(localMuteTicks, Math.max(0, ticks));
+        if (activeHeartbeat != null) {
+            activeHeartbeat.stopImmediately();
+            Minecraft.getInstance().getSoundManager().stop(activeHeartbeat);
+            activeHeartbeat = null;
+        }
+    }
+
     public void clear() {
         if (activeHeartbeat != null) {
             activeHeartbeat.stopImmediately();
@@ -88,6 +121,7 @@ public final class HeartbeatSoundController {
             activeHeartbeat = null;
         }
         lastAdrenalineHeartbeatTriggerId = -1;
+        localMuteTicks = 0;
     }
 
     private boolean isCriticalPartRed(PlayerDamageModel model) {
@@ -104,7 +138,7 @@ public final class HeartbeatSoundController {
     }
 
     private boolean isSuppressed(PlayerDamageModel model) {
-        return model.getSuppressionHoldTicks() > 0 || model.getSuppressionIntensity() > ACTIVE_SUPPRESSION_THRESHOLD;
+        return model.getSuppressionHoldTicks() > 0 && model.getSuppressionIntensity() > ACTIVE_SUPPRESSION_THRESHOLD;
     }
 
     private @Nullable HeartbeatLoopSound ensureHeartbeat(Minecraft minecraft, LocalPlayer player) {
