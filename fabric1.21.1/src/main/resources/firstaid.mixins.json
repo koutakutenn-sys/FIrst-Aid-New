@@ -20,6 +20,8 @@
     "client.GuiMixin",
     "client.GameRendererMixin",
     "client.GameRendererEffectAccessor",
+    "client.PostChainAccessor",
+    "client.PostPassAccessor",
     "client.LivingEntityRendererMixin",
     "client.MouseHandlerMixin",
     "client.PlayerModelMixin",

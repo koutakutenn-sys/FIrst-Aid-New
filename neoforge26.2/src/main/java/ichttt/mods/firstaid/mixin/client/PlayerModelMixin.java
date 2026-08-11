@@ -1,21 +1,24 @@
 package ichttt.mods.firstaid.mixin.client;
 
+import ichttt.mods.firstaid.client.RenderStateExtensions;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Previously froze limbs into a static corpse pose while downed.
- * Downed players now use forced {@code Pose.SWIMMING}, so vanilla swimming/crawl
- * limb animation must remain intact for crawl movement feedback.
+ * Speeds crawl limb animation while downed so limb cadence matches reduced crawl speed.
  */
 @Mixin(PlayerModel.class)
 public abstract class PlayerModelMixin extends HumanoidModel<AvatarRenderState> {
+    private static final float CRAWL_ANIM_POS_MULT = 2.85F;
+    private static final float CRAWL_ANIM_SPEED_MULT = 2.50F;
+    private static final float CRAWL_ANIM_SPEED_MIN = 0.45F;
 
     protected PlayerModelMixin(ModelPart root) {
         super(root);
@@ -23,9 +26,21 @@ public abstract class PlayerModelMixin extends HumanoidModel<AvatarRenderState> 
 
     @Inject(
             method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)V",
-            at = @At("TAIL")
+            at = @At("HEAD")
     )
-    private void firstaid$setupAnim(AvatarRenderState renderState, CallbackInfo ci) {
-        // Intentionally empty: keep vanilla swimming/crawl animation while downed.
+    private void firstaid$boostCrawlAnim(AvatarRenderState renderState, CallbackInfo ci) {
+        Boolean unconscious = renderState.getRenderData(RenderStateExtensions.UNCONSCIOUS);
+        if (unconscious == null || !unconscious) {
+            return;
+        }
+        // walkAnimationPos drives phase; walkAnimationSpeed drives amplitude.
+        renderState.walkAnimationPos *= CRAWL_ANIM_POS_MULT;
+        if (renderState.walkAnimationSpeed > 0.01F) {
+            renderState.walkAnimationSpeed = Mth.clamp(
+                    Math.max(renderState.walkAnimationSpeed * CRAWL_ANIM_SPEED_MULT, CRAWL_ANIM_SPEED_MIN),
+                    0.0F,
+                    1.0F
+            );
+        }
     }
 }

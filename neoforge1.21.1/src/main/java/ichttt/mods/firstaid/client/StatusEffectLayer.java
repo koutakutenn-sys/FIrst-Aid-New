@@ -100,7 +100,7 @@ public class StatusEffectLayer implements LayeredDraw.Layer {
         float deathDanger = playerDamageModel == null ? 0.0F : playerDamageModel.getDeathCountdownDangerProgress();
         boolean painSuppressed = minecraft.player.hasEffect(RegistryObjects.MORPHINE_EFFECT)
                 || minecraft.player.hasEffect(RegistryObjects.PAINKILLER_EFFECT);
-        float basePain = painSuppressed || playerDamageModel == null ? 0.0F : playerDamageModel.getPainVisualStrength();
+        float basePain = playerDamageModel == null ? 0.0F : playerDamageModel.getPainVisualStrength(painSuppressed);
         float dangerPain = deathDanger <= 0.0F ? 0.0F : Mth.clamp(0.18F + deathDanger * 0.82F, 0.0F, 1.0F);
         float targetPain = Math.max(basePain, dangerPain);
         SuppressionFeedbackController suppressionFeedbackController = ClientEventHandler.getSuppressionFeedbackController();

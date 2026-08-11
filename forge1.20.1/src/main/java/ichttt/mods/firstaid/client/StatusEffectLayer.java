@@ -75,7 +75,12 @@ public class StatusEffectLayer implements IGuiOverlay {
         float deathDanger = getDeathDangerProgress(damageModel);
         boolean painSuppressed = minecraft.player.hasEffect(RegistryObjects.MORPHINE_EFFECT.get())
                 || minecraft.player.hasEffect(RegistryObjects.PAINKILLER_EFFECT.get());
-        float basePain = painSuppressed ? 0.0F : damageModel.getPainVisualStrength();
+        float basePain;
+        if (damageModel instanceof PlayerDamageModel) {
+            basePain = ((PlayerDamageModel) damageModel).getPainVisualStrength(painSuppressed);
+        } else {
+            basePain = painSuppressed ? 0.0F : damageModel.getPainVisualStrength();
+        }
         float dangerPain = deathDanger <= 0.0F ? 0.0F : Mth.clamp(0.18F + deathDanger * 0.82F, 0.0F, 1.0F);
         float targetPain = Math.max(basePain, dangerPain);
         SuppressionFeedbackController suppressionFeedbackController = ClientEventHandler.getSuppressionFeedbackController();

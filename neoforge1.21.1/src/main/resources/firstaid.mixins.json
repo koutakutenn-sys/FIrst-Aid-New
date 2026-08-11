@@ -13,6 +13,8 @@
   "client": [
     "client.GameRendererMixin",
     "client.GameRendererPostAccessor",
+    "client.PostChainAccessor",
+    "client.PostPassAccessor",
     "client.LivingEntityRendererMixin",
     "client.PlayerModelMixin",
     "client.PlayerRendererMixin"

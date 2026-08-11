@@ -49,10 +49,12 @@ public final class SuppressionFeedbackController {
     private static final ResourceLocation HEARTBEAT_SOUND = ResourceLocation.fromNamespaceAndPath(FirstAid.MODID, "debuff.heartbeat");
     private static final Set<ResourceLocation> INTERNAL_SOUNDS = Set.of(TINNITUS_SOUND, HEARTBEAT_SOUND);
     private static final float PAIN_FOV_MAX_REDUCTION = 12.0F;
-    private static final float PAIN_FOV_GAIN = 0.18F;
-    private static final float PAIN_FOV_DECAY = 0.04F;
+    private static final float PAIN_FOV_HARD_MAX_REDUCTION = 22.0F;
+    private static final float PAIN_FOV_GAIN = 0.22F;
+    private static final float PAIN_FOV_DECAY = 0.05F;
     private static final float SUPPRESSION_FOV_MIN = 30.0F;
     private static final int SEVERE_PAIN_LEVEL = 4;
+    private static final float ACUTE_TINNITUS_THRESHOLD = 0.85F;
     private static final int SEVERE_PAIN_SOUND_COOLDOWN_TICKS = 60;
     private static final float HIGH_SUPPRESSION_TINNITUS_THRESHOLD = 0.42F;
     private static final int HIGH_SUPPRESSION_TINNITUS_COOLDOWN_TICKS = 36;
@@ -107,6 +109,7 @@ public final class SuppressionFeedbackController {
     private float fovImpulse;
     private long soundCooldownUntilGameTime;
     private int lastPainLevel;
+    private float lastAcutePain;
     private int hallucinationCooldownTicks;
     private @Nullable Level trackedLevel;
 
@@ -125,6 +128,7 @@ public final class SuppressionFeedbackController {
         AbstractPlayerDamageModel damageModel = CommonUtils.getDamageModel(player);
         PlayerDamageModel playerDamageModel = damageModel instanceof PlayerDamageModel model ? model : null;
         int painLevel = playerDamageModel == null ? 0 : playerDamageModel.getPainLevel();
+        float acutePain = playerDamageModel == null ? 0.0F : playerDamageModel.getAcutePainIntensity();
         float suppressionScale = FirstAid.lowSuppressionEnabled ? FirstAid.lowSuppressionMultiplier : 1.0F;
         suppressionIntensity = (playerDamageModel == null ? 0.0F : playerDamageModel.getSuppressionIntensity()) * suppressionScale;
         holdTicks = playerDamageModel == null ? 0 : playerDamageModel.getSuppressionHoldTicks();
@@ -132,9 +136,17 @@ public final class SuppressionFeedbackController {
         float addictionNorm = playerDamageModel == null ? 0.0F : playerDamageModel.getAddictionNormalized();
         boolean painSuppressed = player.hasEffect(RegistryObjects.PAINKILLER_EFFECT)
                 || player.hasEffect(RegistryObjects.MORPHINE_EFFECT);
-        float targetPainFov = painSuppressed || playerDamageModel == null || !FirstAid.enablePainFovCompression
-                ? 0.0F
-                : playerDamageModel.getPainVisualStrength() * PAIN_FOV_MAX_REDUCTION;
+        float targetPainFov = 0.0F;
+        if (playerDamageModel != null && FirstAid.enablePainFovCompression) {
+            float visual = playerDamageModel.getPainVisualStrength(painSuppressed);
+            if (visual > 0.01F) {
+                // Scale FOV: soft band to 12°, hard acute spikes up to 22°.
+                float soft = Mth.clamp(visual, 0.0F, 1.0F) * PAIN_FOV_MAX_REDUCTION;
+                float hardExtra = Math.max(0.0F, visual - 1.0F) / (PlayerDamageModel.PAIN_HARD_CAP - 1.0F)
+                        * (PAIN_FOV_HARD_MAX_REDUCTION - PAIN_FOV_MAX_REDUCTION);
+                targetPainFov = soft + hardExtra;
+            }
+        }
 
         boolean holding = holdTicks > 0;
         float targetMuffle = holding
@@ -177,12 +189,18 @@ public final class SuppressionFeedbackController {
             } else if (FirstAid.enablePainAudioEffects && painLevel >= SEVERE_PAIN_LEVEL && lastPainLevel < SEVERE_PAIN_LEVEL) {
                 soundCooldownUntilGameTime = level.getGameTime() + SEVERE_PAIN_SOUND_COOLDOWN_TICKS;
                 playTinnitusSound(0.52F + 0.12F * Math.min(2, painLevel - SEVERE_PAIN_LEVEL));
+            } else if (FirstAid.enablePainAudioEffects
+                    && acutePain >= ACUTE_TINNITUS_THRESHOLD
+                    && lastAcutePain < ACUTE_TINNITUS_THRESHOLD) {
+                soundCooldownUntilGameTime = level.getGameTime() + SEVERE_PAIN_SOUND_COOLDOWN_TICKS;
+                playTinnitusSound(0.48F + 0.18F * Mth.clamp(acutePain - ACUTE_TINNITUS_THRESHOLD, 0.0F, 1.0F));
             }
         }
 
         tickWithdrawalHallucinations(player, level, withdrawalActive, addictionNorm);
 
         lastPainLevel = painLevel;
+        lastAcutePain = acutePain;
     }
 
     public void clear() {

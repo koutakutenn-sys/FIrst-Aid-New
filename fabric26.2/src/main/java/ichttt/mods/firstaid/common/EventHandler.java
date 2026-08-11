@@ -564,16 +564,13 @@ public final class EventHandler {
       if (playerDamageModel.canCrawlWhileDowned()) {
          double maxHorizontal = 0.10D * playerDamageModel.getCrawlSpeedFactor() / 0.28D;
          maxHorizontal = Math.max(0.06D, Math.min(0.12D, maxHorizontal));
-         double horizontal = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
-         double nx = motion.x;
-         double nz = motion.z;
-         if (horizontal > maxHorizontal && horizontal > 0.0D) {
-            double scale = maxHorizontal / horizontal;
-            nx *= scale;
-            nz *= scale;
+         Vec3 projected = projectForwardCrawlMotion(player, motion.x, y, motion.z, maxHorizontal);
+         if (projected.x != motion.x || projected.z != motion.z || motion.y > 0.0D) {
+            player.setDeltaMovement(projected);
          }
-         if (nx != motion.x || nz != motion.z || motion.y > 0.0D) {
-            player.setDeltaMovement(nx, y, nz);
+         player.xxa = 0.0F;
+         if (player.zza < 0.0F) {
+            player.zza = 0.0F;
          }
          player.yya = 0.0F;
          player.hurtMarked = true;
@@ -586,6 +583,28 @@ public final class EventHandler {
       player.zza = 0.0F;
       player.yya = 0.0F;
       player.hurtMarked = true;
+   }
+
+   private static Vec3 projectForwardCrawlMotion(Player player, double motionX, double motionY, double motionZ, double maxHorizontal) {
+      Vec3 look = player.getLookAngle();
+      double fx = look.x;
+      double fz = look.z;
+      double flen = Math.sqrt(fx * fx + fz * fz);
+      if (flen < 1.0E-4D) {
+         fx = 0.0D;
+         fz = 1.0D;
+         flen = 1.0D;
+      }
+      fx /= flen;
+      fz /= flen;
+      double along = motionX * fx + motionZ * fz;
+      if (along < 0.0D) {
+         along = 0.0D;
+      }
+      if (along > maxHorizontal) {
+         along = maxHorizontal;
+      }
+      return new Vec3(fx * along, motionY, fz * along);
    }
 
    private static boolean isProtectedUnconsciousSuffocation(AbstractPlayerDamageModel damageModel, DamageSource source) {

@@ -11,7 +11,9 @@
       "uniforms": [
         {
           "name": "Amount",
-          "values": [ 0.0 ]
+          "values": [
+            0.0
+          ]
         }
       ]
     },
@@ -22,7 +24,9 @@
       "uniforms": [
         {
           "name": "Strength",
-          "values": [ 0.0 ]
+          "values": [
+            0.0
+          ]
         }
       ]
     },

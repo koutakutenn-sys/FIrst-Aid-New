@@ -72,6 +72,7 @@ public class ClientEventHandler {
     private static final int SYNC_RETRY_TICKS = 20;
     private static final SuppressionFeedbackController SUPPRESSION_FEEDBACK_CONTROLLER = new SuppressionFeedbackController();
     private static final PainVisualEffectsController PAIN_VISUAL_EFFECTS_CONTROLLER = new PainVisualEffectsController();
+   private static final MorphineRushController MORPHINE_RUSH_CONTROLLER = new MorphineRushController();
     private static final ProjectileNearMissDetector PROJECTILE_NEAR_MISS_DETECTOR = new ProjectileNearMissDetector(SUPPRESSION_FEEDBACK_CONTROLLER);
     private static final HeartbeatSoundController HEARTBEAT_SOUND_CONTROLLER = new HeartbeatSoundController();
 
@@ -118,6 +119,7 @@ public class ClientEventHandler {
         retryDamageModelSync(mc);
         SUPPRESSION_FEEDBACK_CONTROLLER.tick(mc);
         PAIN_VISUAL_EFFECTS_CONTROLLER.tick(mc);
+         MORPHINE_RUSH_CONTROLLER.tick(mc);
         HEARTBEAT_SOUND_CONTROLLER.tick(mc);
         HealingSoundController.tick(mc);
         PROJECTILE_NEAR_MISS_DETECTOR.tick(mc);
@@ -275,6 +277,7 @@ public class ClientEventHandler {
         HEARTBEAT_SOUND_CONTROLLER.clear();
         SUPPRESSION_FEEDBACK_CONTROLLER.clear();
         PAIN_VISUAL_EFFECTS_CONTROLLER.clear(Minecraft.getInstance());
+      MORPHINE_RUSH_CONTROLLER.clear();
         PROJECTILE_NEAR_MISS_DETECTOR.clear();
         StatusEffectLayer.INSTANCE.resetDebugState();
     }
@@ -543,8 +546,16 @@ public class ClientEventHandler {
         }
         if (input != null) {
             if (allowCrawl) {
-                input.leftImpulse *= crawlFactor;
-                input.forwardImpulse *= crawlFactor;
+                // Forward-only crawl: no strafe / reverse.
+                input.leftImpulse = 0.0F;
+                if (input.forwardImpulse < 0.0F) {
+                    input.forwardImpulse = 0.0F;
+                } else {
+                    input.forwardImpulse *= crawlFactor;
+                }
+                input.down = false;
+                input.left = false;
+                input.right = false;
                 input.jumping = false;
                 input.shiftKeyDown = false;
             } else {
@@ -565,10 +576,10 @@ public class ClientEventHandler {
         if (mc.options != null) {
             if (!allowCrawl) {
                 mc.options.keyUp.setDown(false);
-                mc.options.keyDown.setDown(false);
-                mc.options.keyLeft.setDown(false);
-                mc.options.keyRight.setDown(false);
             }
+            mc.options.keyDown.setDown(false);
+            mc.options.keyLeft.setDown(false);
+            mc.options.keyRight.setDown(false);
             mc.options.keyJump.setDown(false);
             mc.options.keySprint.setDown(false);
             for (net.minecraft.client.KeyMapping keyMapping : mc.options.keyMappings) {
@@ -584,13 +595,10 @@ public class ClientEventHandler {
         Vec3 motion = player.getDeltaMovement();
         double y = Math.min(0.0D, motion.y);
         if (allowCrawl) {
-            double maxHorizontal = 0.10D;
-            double horizontal = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
-            if (horizontal > maxHorizontal && horizontal > 0.0D) {
-                double scale = maxHorizontal / horizontal;
-                player.setDeltaMovement(motion.x * scale, y, motion.z * scale);
-            } else if (motion.y > 0.0D) {
-                player.setDeltaMovement(motion.x, y, motion.z);
+            player.setDeltaMovement(projectForwardCrawlMotion(player, motion.x, y, motion.z, 0.10D));
+            player.xxa = 0.0F;
+            if (player.zza < 0.0F) {
+                player.zza = 0.0F;
             }
             player.yya = 0.0F;
         } else {
@@ -601,6 +609,28 @@ public class ClientEventHandler {
             player.zza = 0.0F;
             player.yya = 0.0F;
         }
+    }
+
+    private static Vec3 projectForwardCrawlMotion(Player player, double motionX, double motionY, double motionZ, double maxHorizontal) {
+        Vec3 look = player.getLookAngle();
+        double fx = look.x;
+        double fz = look.z;
+        double flen = Math.sqrt(fx * fx + fz * fz);
+        if (flen < 1.0E-4D) {
+            fx = 0.0D;
+            fz = 1.0D;
+            flen = 1.0D;
+        }
+        fx /= flen;
+        fz /= flen;
+        double along = motionX * fx + motionZ * fz;
+        if (along < 0.0D) {
+            along = 0.0D;
+        }
+        if (along > maxHorizontal) {
+            along = maxHorizontal;
+        }
+        return new Vec3(fx * along, motionY, fz * along);
     }
 
     private static void retryDamageModelSync(Minecraft mc) {

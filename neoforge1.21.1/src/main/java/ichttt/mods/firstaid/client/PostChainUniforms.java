@@ -6,121 +6,101 @@
 package ichttt.mods.firstaid.client;
 
 import ichttt.mods.firstaid.FirstAid;
+import ichttt.mods.firstaid.mixin.client.PostChainAccessor;
+import ichttt.mods.firstaid.mixin.client.PostPassAccessor;
 import net.minecraft.client.renderer.EffectInstance;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.client.renderer.PostPass;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Sets float uniforms on every pass of a classic PostChain (1.20.x / 1.21.1).
+ * Writes float uniforms onto classic PostChain passes via Mixin accessors.
+ * (Uniform class package differs across mappings — always use reflection for set.)
  */
 public final class PostChainUniforms {
-    private static Field passesField;
-    private static Field effectField;
-    private static Method getUniformMethod;
-    private static boolean resolved;
-    private static boolean loggedMissing;
     private static boolean loggedOk;
+    private static boolean loggedFail;
 
     private PostChainUniforms() {
     }
 
-    public static void setFloat(PostChain chain, String uniformName, float value) {
+    /**
+     * @return number of passes that accepted the uniform
+     */
+    public static int setFloat(PostChain chain, String uniformName, float value) {
         if (chain == null) {
-            return;
+            return 0;
         }
-        resolve();
-        if (passesField == null || effectField == null) {
-            if (!loggedMissing) {
-                loggedMissing = true;
-                FirstAid.LOGGER.warn("PostChain uniform reflection unavailable; color grade may stick at defaults");
-            }
-            return;
-        }
+
+        int applied = 0;
+
+        // Public API when present (1.21+)
         try {
-            @SuppressWarnings("unchecked")
-            List<PostPass> passes = (List<PostPass>) passesField.get(chain);
-            if (passes == null) {
-                return;
-            }
-            int applied = 0;
-            for (PostPass pass : passes) {
-                EffectInstance effect = (EffectInstance) effectField.get(pass);
-                if (effect == null) {
-                    continue;
+            chain.setUniform(uniformName, value);
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            List<PostPass> passes = ((PostChainAccessor) (Object) chain).firstaid$getPasses();
+            if (passes != null) {
+                for (PostPass pass : passes) {
+                    if (pass == null) {
+                        continue;
+                    }
+                    EffectInstance effect = ((PostPassAccessor) (Object) pass).firstaid$getEffect();
+                    if (effect != null && writeUniform(effect, uniformName, value)) {
+                        applied++;
+                    }
                 }
-                Object uniform = getUniform(effect, uniformName);
-                if (uniform == null) {
-                    continue;
+            }
+        } catch (Throwable t) {
+            if (!loggedFail) {
+                loggedFail = true;
+                FirstAid.LOGGER.warn("PostChain accessor uniform path failed for {}", uniformName, t);
+            }
+        }
+
+        if (applied > 0 && !loggedOk) {
+            loggedOk = true;
+            FirstAid.LOGGER.info("PostChain uniforms active ({} pass(es), {}={})", applied, uniformName, value);
+        }
+        return applied;
+    }
+
+    private static boolean writeUniform(EffectInstance effect, String name, float value) {
+        try {
+            try {
+                Method safe = effect.getClass().getMethod("safeGetUniform", String.class);
+                Object opt = safe.invoke(effect, name);
+                if (opt instanceof Optional<?> optional) {
+                    return optional.isPresent() && setUniformObject(optional.get(), value);
                 }
-                // Uniform.set(float) — present on mapped 1.20.1 / 1.21.1
-                Method set = uniform.getClass().getMethod("set", float.class);
-                set.invoke(uniform, value);
-                applied++;
+            } catch (NoSuchMethodException ignored) {
             }
-            if (applied > 0 && !loggedOk) {
-                loggedOk = true;
-                FirstAid.LOGGER.info("PostChain uniforms active (first set {}={})", uniformName, value);
-            } else if (applied == 0 && !loggedMissing) {
-                // Not fatal: blit passes have neither Amount nor Strength
-            }
-        } catch (Exception e) {
-            if (!loggedMissing) {
-                loggedMissing = true;
-                FirstAid.LOGGER.warn("Could not set post uniform {}={}", uniformName, value, e);
-            }
+
+            Object uniform = effect.getUniform(name);
+            return uniform != null && setUniformObject(uniform, value);
+        } catch (Throwable t) {
+            return false;
         }
     }
 
-    private static Object getUniform(EffectInstance effect, String name) {
+    private static boolean setUniformObject(Object uniform, float value) {
         try {
-            if (getUniformMethod != null) {
-                return getUniformMethod.invoke(effect, name);
-            }
-            return effect.getUniform(name);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static void resolve() {
-        if (resolved) {
-            return;
-        }
-        resolved = true;
-        try {
-            passesField = PostChain.class.getDeclaredField("passes");
-            passesField.setAccessible(true);
-        } catch (NoSuchFieldException e) {
-            for (Field field : PostChain.class.getDeclaredFields()) {
-                if (List.class.isAssignableFrom(field.getType())) {
-                    field.setAccessible(true);
-                    passesField = field;
-                    break;
-                }
-            }
+            Method set = uniform.getClass().getMethod("set", float.class);
+            set.invoke(uniform, value);
+            return true;
+        } catch (Throwable ignored) {
         }
         try {
-            effectField = PostPass.class.getDeclaredField("effect");
-            effectField.setAccessible(true);
-        } catch (NoSuchFieldException e) {
-            for (Field field : PostPass.class.getDeclaredFields()) {
-                if (EffectInstance.class.isAssignableFrom(field.getType())) {
-                    field.setAccessible(true);
-                    effectField = field;
-                    break;
-                }
-            }
+            Method setArr = uniform.getClass().getMethod("set", float[].class);
+            setArr.invoke(uniform, (Object) new float[]{value});
+            return true;
+        } catch (Throwable ignored) {
         }
-        try {
-            getUniformMethod = EffectInstance.class.getMethod("getUniform", String.class);
-        } catch (NoSuchMethodException ignored) {
-        }
-        if (passesField == null || effectField == null) {
-            FirstAid.LOGGER.warn("PostChain uniform reflection failed; dynamic morphine/suppression grade may not apply");
-        }
+        return false;
     }
 }

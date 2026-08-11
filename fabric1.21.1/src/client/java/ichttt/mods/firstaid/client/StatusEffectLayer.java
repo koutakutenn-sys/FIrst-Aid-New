@@ -46,8 +46,9 @@ public class StatusEffectLayer implements HudRenderCallback {
                int width = minecraft.getWindow().getGuiScaledWidth();
                int height = minecraft.getWindow().getGuiScaledHeight();
                float deathDanger = playerDamageModel == null ? 0.0F : playerDamageModel.getDeathCountdownDangerProgress();
-               boolean painSuppressed = minecraft.player.hasEffect(RegistryObjects.PAINKILLER_EFFECT);
-               float basePain = !painSuppressed && playerDamageModel != null ? playerDamageModel.getPainVisualStrength() : 0.0F;
+               boolean painSuppressed = minecraft.player.hasEffect(RegistryObjects.PAINKILLER_EFFECT)
+                  || minecraft.player.hasEffect(RegistryObjects.MORPHINE_EFFECT);
+               float basePain = playerDamageModel != null ? playerDamageModel.getPainVisualStrength(painSuppressed) : 0.0F;
                float dangerPain = deathDanger <= 0.0F ? 0.0F : Mth.clamp(0.18F + deathDanger * 0.82F, 0.0F, 1.0F);
                float targetPain = Math.max(basePain, dangerPain);
                SuppressionFeedbackController suppressionFeedbackController = ClientEventHandler.getSuppressionFeedbackController();

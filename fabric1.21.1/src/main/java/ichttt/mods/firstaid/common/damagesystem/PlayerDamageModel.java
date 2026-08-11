@@ -90,6 +90,26 @@ extends AbstractPlayerDamageModel
 implements LookupReloadListener {
     private static final DecimalFormat TEXT_FORMAT = new DecimalFormat("0.0");
     private static final int MAX_PAIN_LEVEL = 5;
+    /** Normal full chronic pain reference (visual strength 1.0). */
+    public static final float CHRONIC_SOFT_CAP = 1.0f;
+    /** Brief near-blind ceiling for acute + chronic. */
+    public static final float PAIN_HARD_CAP = 1.85f;
+    private static final float ACUTE_GAIN_PER_MISSING_HP = 0.22f;
+    private static final float ACUTE_GAIN_MAX_PER_HIT = 0.95f;
+    private static final float ACUTE_DECAY_PER_TICK = 0.015f;
+    private static final float ACUTE_FAST_DECAY_MULTIPLIER = 1.65f;
+    private static final float CHRONIC_POWER = 1.55f;
+    private static final float CHRONIC_SCALE = 0.92f;
+    /** Fraction of acute pain that still shows under opioids. */
+    public static final float ACUTE_BREAKTHROUGH = 0.25f;
+    private static final float ACUTE_HITCH_THRESHOLD = 0.70f;
+    private static final int ACUTE_HITCH_DURATION_TICKS = 10;
+    private static final int ACUTE_HITCH_COOLDOWN_TICKS = 40;
+    private static final float SPRINT_FLARE_CHRONIC_MIN = 0.36f;
+    private static final float SPRINT_FLARE_ACUTE = 0.08f;
+    private static final int MORPHINE_RUSH_TICKS = 200;
+    private static final float MORPHINE_SAT_DECAY_K = 1.65f;
+    private static final float MORPHINE_SAT_END_FADE = 0.08f;
     private static final int MAX_ADRENALINE_LEVEL = 3;
     private static final int MAX_ADRENALINE_TICKS = 200;
     private static final float MAX_SUPPRESSION_INTENSITY = 1.0f;
@@ -166,6 +186,8 @@ implements LookupReloadListener {
     private int morphineTicksLeft = 0;
     /** Peak morphine duration for this dose; used for remaining-ratio visual fade. */
     private int morphineMaxTicks = 0;
+    /** Client rush SFX window after morphine activates (10s). */
+    private int morphineRushTicks = 0;
     private int pendingPainkillerTicks = 0;
     private int pendingMorphineDelayTicks = 0;
     private int pendingMorphineEffectTicks = 0;
@@ -177,6 +199,10 @@ implements LookupReloadListener {
     private boolean needsMorphineUpdate = false;
     private int resyncTimer = -1;
     private int painLevel = 0;
+    private float chronicPainIntensity = 0.0f;
+    private float acutePainIntensity = 0.0f;
+    private float lastTrackedMissingHealth = -1.0f;
+    private int acuteHitchCooldownTicks = 0;
     private int adrenalineLevel = 0;
     private int adrenalineTicks = 0;
     private int adrenalineHeartbeatTriggerId = 0;
@@ -221,11 +247,14 @@ implements LookupReloadListener {
         tagCompound.putBoolean("hasTutorial", this.hasTutorial);
         tagCompound.putInt("morphineTicks", this.morphineTicksLeft);
         tagCompound.putInt("morphineMaxTicks", this.morphineMaxTicks);
+        tagCompound.putInt("morphineRushTicks", this.morphineRushTicks);
         tagCompound.putInt("pendingPainkillerTicks", this.pendingPainkillerTicks);
         tagCompound.putInt("pendingMorphineDelayTicks", this.pendingMorphineDelayTicks);
         tagCompound.putInt("pendingMorphineEffectTicks", this.pendingMorphineEffectTicks);
         tagCompound.putBoolean("pendingMorphineMedicalUse", this.pendingMorphineMedicalUse);
         tagCompound.putInt("painLevel", this.painLevel);
+        tagCompound.putFloat("chronicPainIntensity", this.chronicPainIntensity);
+        tagCompound.putFloat("acutePainIntensity", this.acutePainIntensity);
         tagCompound.putInt("adrenalineLevel", this.adrenalineLevel);
         tagCompound.putInt("adrenalineTicks", this.adrenalineTicks);
         tagCompound.putInt("adrenalineHeartbeatTriggerId", this.adrenalineHeartbeatTriggerId);
@@ -268,6 +297,7 @@ implements LookupReloadListener {
             this.needsMorphineUpdate = true;
         }
         this.morphineMaxTicks = nbt.contains("morphineMaxTicks") ? nbt.getInt("morphineMaxTicks") : Math.max(this.morphineMaxTicks, this.morphineTicksLeft);
+        this.morphineRushTicks = nbt.contains("morphineRushTicks") ? Math.max(0, nbt.getInt("morphineRushTicks")) : 0;
         this.pendingPainkillerTicks = nbt.getInt("pendingPainkillerTicks");
         this.pendingMorphineDelayTicks = nbt.getInt("pendingMorphineDelayTicks");
         this.pendingMorphineEffectTicks = nbt.getInt("pendingMorphineEffectTicks");
@@ -276,6 +306,12 @@ implements LookupReloadListener {
             this.hasTutorial = nbt.getBoolean("hasTutorial");
         }
         this.painLevel = nbt.getInt("painLevel");
+        this.chronicPainIntensity = nbt.contains("chronicPainIntensity")
+            ? Mth.clamp(nbt.getFloat("chronicPainIntensity"), 0.0f, CHRONIC_SOFT_CAP)
+            : 0.0f;
+        this.acutePainIntensity = nbt.contains("acutePainIntensity")
+            ? Mth.clamp(nbt.getFloat("acutePainIntensity"), 0.0f, PAIN_HARD_CAP)
+            : 0.0f;
         this.adrenalineLevel = nbt.getInt("adrenalineLevel");
         this.adrenalineTicks = nbt.getInt("adrenalineTicks");
         this.adrenalineHeartbeatTriggerId = nbt.getInt("adrenalineHeartbeatTriggerId");
@@ -379,6 +415,7 @@ implements LookupReloadListener {
         if (this.morphineTicksLeft <= 0) {
             this.morphineTicksLeft = 0;
             this.morphineMaxTicks = 0;
+            this.morphineRushTicks = 0;
         } else {
             this.trackMorphineMaxDuration();
         }
@@ -393,8 +430,18 @@ implements LookupReloadListener {
         } else {
             this.clearUnconsciousPenalties(player);
         }
-        // Client: keep the higher of synced pain and locally calculated injury pain.
+        // Client: predictive acute/rush decay between syncs; keep higher of synced vs local pain level.
         if (world.isClientSide()) {
+            if (this.acutePainIntensity > 0.0f) {
+                float decay = ACUTE_DECAY_PER_TICK;
+                if (this.acutePainIntensity > CHRONIC_SOFT_CAP) {
+                    decay *= ACUTE_FAST_DECAY_MULTIPLIER;
+                }
+                this.acutePainIntensity = Math.max(0.0f, this.acutePainIntensity - decay);
+            }
+            if (this.morphineRushTicks > 0) {
+                --this.morphineRushTicks;
+            }
             int localPain = this.calculatePainLevel();
             if (this.isWithdrawalEpisodeActive()) {
                 localPain = Math.max(localPain, this.getAddictionPainLevel());
@@ -498,16 +545,19 @@ implements LookupReloadListener {
 
     public void applyMorphineInjection(Player player) {
         int basePainRelief = PlayerDamageModel.getRandMorphineDuration();
-        int painDuration = Math.round((float)basePainRelief * 2.5f);
+        // Painkiller is the long relief window (2.5x). Morphine identity/sat is the shorter base window.
+        int painDuration = Math.round((float) basePainRelief * MORPHINE_INJECTOR_DURATION_MULTIPLIER);
         MobEffectInstance activePainkiller = player.getEffect(RegistryObjects.PAINKILLER_EFFECT);
         painDuration = Math.max(painDuration, activePainkiller == null ? 0 : activePainkiller.getDuration());
-        int morphineDuration = this.computeMorphineEffectDuration(painDuration);
+        // IMPORTANT: do not compute morphine from the 2.5x painkiller window — that made sat track painkiller.
+        int morphineDuration = this.computeMorphineEffectDuration(basePainRelief);
         MobEffectInstance activeMorphine = player.getEffect(RegistryObjects.MORPHINE_EFFECT);
         morphineDuration = Math.max(morphineDuration, activeMorphine == null ? 0 : activeMorphine.getDuration());
         player.addEffect(new MobEffectInstance(RegistryObjects.MORPHINE_EFFECT, morphineDuration, 0, false, false));
         player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, painDuration, 0, false, false));
         player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 3600, 0, false, false));
         this.setMorphineDuration(morphineDuration);
+        this.startMorphineRush();
         this.needsMorphineUpdate = false;
         this.forceMaxSuppression(player);
         this.registerOpioidUse(player, true, this.isMedicalOpioidUse());
@@ -525,6 +575,7 @@ implements LookupReloadListener {
         player.addEffect(new MobEffectInstance(RegistryObjects.PAINKILLER_EFFECT, painDuration, 0, false, false));
         player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 500, 0, false, false));
         this.setMorphineDuration(morphineDuration);
+        this.startMorphineRush();
         this.needsMorphineUpdate = false;
         this.registerOpioidUse(player, false, medicalUse);
     }
@@ -725,11 +776,80 @@ implements LookupReloadListener {
         return 3.0;
     }
 
+    public float getChronicPainIntensity() {
+        return this.chronicPainIntensity;
+    }
+
+    public float getAcutePainIntensity() {
+        return this.acutePainIntensity;
+    }
+
+    public float getEffectivePainIntensity() {
+        return Math.min(PAIN_HARD_CAP, this.chronicPainIntensity + this.acutePainIntensity);
+    }
+
+    /**
+     * Continuous pain strength for client FX. Can exceed 1.0 during acute spikes (hard cap {@link #PAIN_HARD_CAP}).
+     */
     public float getPainVisualStrength() {
-        if (this.painLevel <= 0) {
+        return this.getPainVisualStrength(false);
+    }
+
+    /**
+     * @param painSuppressed when true, chronic contribution is muted and only acute breakthrough remains
+     */
+    public float getPainVisualStrength(boolean painSuppressed) {
+        float effective = painSuppressed
+            ? this.acutePainIntensity * ACUTE_BREAKTHROUGH
+            : this.getEffectivePainIntensity();
+        if (effective <= 0.0f && this.painLevel <= 0) {
             return 0.0f;
         }
-        return Math.min(1.0f, (float)this.painLevel / 5.0f);
+        return Math.min(PAIN_HARD_CAP, effective) / CHRONIC_SOFT_CAP;
+    }
+
+    public int getMorphineRushTicks() {
+        return this.morphineRushTicks;
+    }
+
+    /**
+     * Morphine color-grade factor 0..1 using decelerating decay over the dose, with a rush floor for the first 10s.
+     * <p>
+     * Important: never treat a missing {@code morphineMaxTicks} as full-strength forever — that made classic
+     * continuous post FX look stuck at peak on some loaders.
+     */
+    public float getMorphineSaturationFactor() {
+        if (this.morphineTicksLeft <= 0) {
+            return 0.0f;
+        }
+        // Recover peak if NBT/sync lagged (client often saw max=0 → ratio 0 → old code forced peak).
+        if (this.morphineMaxTicks < this.morphineTicksLeft) {
+            this.morphineMaxTicks = this.morphineTicksLeft;
+        }
+        float ratio = this.morphineMaxTicks <= 0
+            ? 1.0f
+            : Mth.clamp(this.morphineTicksLeft / (float) this.morphineMaxTicks, 0.0f, 1.0f);
+        float progress = 1.0f - ratio;
+        // Decelerating descent: steep early, flatter late (exp).
+        float base = (float) Math.exp(-MORPHINE_SAT_DECAY_K * (double) progress);
+        // Extra continuous-grade shaping so mid-dose is clearly below onset on live uniforms
+        // (tiered 26.2 already quantizes; classic composite needs a stronger mid drop).
+        float continuousShape = ratio * ratio; // remaining²
+        float shaped = base * (0.35f + 0.65f * continuousShape);
+        float endT = Mth.clamp(ratio / MORPHINE_SAT_END_FADE, 0.0f, 1.0f);
+        float endFade = endT * endT * (3.0f - 2.0f * endT);
+        float curve = shaped * endFade;
+        if (this.morphineRushTicks > 0) {
+            float rushT = 1.0f - this.morphineRushTicks / (float) MORPHINE_RUSH_TICKS;
+            // Hold near peak only during the 10s rush, then follow the decay curve.
+            float rushEnv = 1.0f - 0.20f * rushT;
+            curve = Math.max(curve, 0.90f * rushEnv);
+        }
+        return Mth.clamp(curve, 0.0f, 1.0f);
+    }
+
+    private void startMorphineRush() {
+        this.morphineRushTicks = MORPHINE_RUSH_TICKS;
     }
 
     public float getDeathCountdownDangerProgress() {
@@ -770,6 +890,7 @@ implements LookupReloadListener {
     public void clearPainSuppressants(Player player) {
         this.morphineTicksLeft = 0;
         this.morphineMaxTicks = 0;
+        this.morphineRushTicks = 0;
         this.needsMorphineUpdate = false;
         this.pendingMorphineDelayTicks = 0;
         this.pendingMorphineEffectTicks = 0;
@@ -789,12 +910,17 @@ implements LookupReloadListener {
     public void clearStatusEffects() {
         this.morphineTicksLeft = 0;
         this.morphineMaxTicks = 0;
+        this.morphineRushTicks = 0;
         this.needsMorphineUpdate = false;
         this.pendingPainkillerTicks = 0;
         this.pendingMorphineDelayTicks = 0;
         this.pendingMorphineEffectTicks = 0;
         this.pendingMorphineMedicalUse = false;
         this.painLevel = 0;
+        this.chronicPainIntensity = 0.0f;
+        this.acutePainIntensity = 0.0f;
+        this.lastTrackedMissingHealth = -1.0f;
+        this.acuteHitchCooldownTicks = 0;
         this.adrenalineLevel = 0;
         this.adrenalineTicks = 0;
         this.suppressionIntensity = 0.0f;
@@ -843,6 +969,7 @@ implements LookupReloadListener {
         }
         this.criticalConditionActive = true;
         this.setUnconsciousState(3000, true, true, UNCONSCIOUS_REASON_CRITICAL);
+        this.acutePainIntensity = Math.min(PAIN_HARD_CAP, Math.max(this.acutePainIntensity, 1.25f));
         this.painLevel = Math.max(this.painLevel, 5);
         CommonUtils.runWithoutSetHealthInterception(() -> player.setHealth(Math.max(player.getHealth(), 1.0f)));
         this.scheduleResync();
@@ -881,6 +1008,7 @@ implements LookupReloadListener {
         }
         this.criticalConditionActive = false;
         this.painLevel = Math.max(2, this.painLevel);
+        this.chronicPainIntensity = Math.max(this.chronicPainIntensity, 0.22f);
         if (keepWakeUpDelay) {
             AbstractDamageablePart rescueTarget = this.getFirstCriticalRescueTarget();
             if (healer != null && rescueTarget != null && rescueTarget.activeHealer == null) {
@@ -921,13 +1049,90 @@ implements LookupReloadListener {
 
     public void refreshPainState(Player player) {
         int previousPainLevel = this.painLevel;
+        float previousAcute = this.acutePainIntensity;
+        if (!player.level().isClientSide()) {
+            this.trackInjuryDeltaForAcutePain(player);
+        }
         this.painLevel = this.calculatePainLevel();
-        if (previousPainLevel != this.painLevel) {
+        if (previousPainLevel != this.painLevel || Float.compare(previousAcute, this.acutePainIntensity) != 0) {
             this.scheduleResync();
             if (!player.level().isClientSide() && player instanceof ServerPlayer) {
                 ServerPlayer serverPlayer = (ServerPlayer)player;
                 FirstAidNetworking.sendDamageModelSync(serverPlayer, this, FirstAidConfig.SERVER.scaleMaxHealth.get());
             }
+        }
+    }
+
+    private float sumVisibleMissingHealth() {
+        float total = 0.0f;
+        for (AbstractDamageablePart part : this) {
+            total += CommonUtils.getVisibleMissingHealth(part);
+        }
+        return total;
+    }
+
+    private void trackInjuryDeltaForAcutePain(Player player) {
+        float missing = this.sumVisibleMissingHealth();
+        if (this.lastTrackedMissingHealth < 0.0f) {
+            this.lastTrackedMissingHealth = missing;
+            return;
+        }
+        float delta = missing - this.lastTrackedMissingHealth;
+        this.lastTrackedMissingHealth = missing;
+        if (delta > 0.04f) {
+            this.registerAcutePainFromInjury(player, delta);
+        }
+    }
+
+    public void registerAcutePainFromInjury(@Nullable Player player, float deltaMissingHealth) {
+        if (deltaMissingHealth <= 0.0f) {
+            return;
+        }
+        float previousAcute = this.acutePainIntensity;
+        float gain = Math.min(ACUTE_GAIN_MAX_PER_HIT, deltaMissingHealth * ACUTE_GAIN_PER_MISSING_HP);
+        this.acutePainIntensity = Math.min(PAIN_HARD_CAP, this.acutePainIntensity + gain);
+        if (player != null && !player.level().isClientSide()) {
+            this.tryApplyAcuteHitch(player, previousAcute);
+        }
+    }
+
+    private void tryApplyAcuteHitch(Player player, float previousAcute) {
+        if (this.acuteHitchCooldownTicks > 0) {
+            return;
+        }
+        if (previousAcute >= ACUTE_HITCH_THRESHOLD || this.acutePainIntensity < ACUTE_HITCH_THRESHOLD) {
+            return;
+        }
+        if (this.isPainSuppressed(player)) {
+            return;
+        }
+        player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, ACUTE_HITCH_DURATION_TICKS, 0, false, false, true));
+        this.acuteHitchCooldownTicks = ACUTE_HITCH_COOLDOWN_TICKS;
+    }
+
+    private void tickAcutePainState(Player player) {
+        if (this.acuteHitchCooldownTicks > 0) {
+            --this.acuteHitchCooldownTicks;
+        }
+        if (this.acutePainIntensity > 0.0f) {
+            float decay = ACUTE_DECAY_PER_TICK;
+            if (this.acutePainIntensity > CHRONIC_SOFT_CAP) {
+                decay *= ACUTE_FAST_DECAY_MULTIPLIER;
+            }
+            this.acutePainIntensity = Math.max(0.0f, this.acutePainIntensity - decay);
+        }
+        // Light action flare while sprinting with severe+ chronic injury.
+        if (player.isSprinting()
+            && this.chronicPainIntensity >= SPRINT_FLARE_CHRONIC_MIN
+            && !this.isPainSuppressed(player)
+            && player.tickCount % 20 == 0) {
+            this.acutePainIntensity = Math.min(PAIN_HARD_CAP, this.acutePainIntensity + SPRINT_FLARE_ACUTE);
+        }
+    }
+
+    private void tickMorphineRush() {
+        if (this.morphineRushTicks > 0) {
+            --this.morphineRushTicks;
         }
     }
 
@@ -1247,6 +1452,11 @@ implements LookupReloadListener {
         if (this.resolveExternalReviveState(player)) {
             return;
         }
+        float previousAcute = this.acutePainIntensity;
+        int previousRush = this.morphineRushTicks;
+        this.trackInjuryDeltaForAcutePain(player);
+        this.tickAcutePainState(player);
+        this.tickMorphineRush();
         this.painLevel = this.calculatePainLevel();
         this.tickAddictionState(player);
         if (this.isWithdrawalEpisodeActive()) {
@@ -1282,7 +1492,18 @@ implements LookupReloadListener {
         if (this.unconsciousTicks <= 0) {
             this.clearUnconsciousState();
         }
-        if (previousPainLevel != this.painLevel || previousAdrenalineLevel != this.adrenalineLevel || previousAdrenalineTicks != this.adrenalineTicks || Float.compare(previousSuppressionIntensity, this.suppressionIntensity) != 0 || previousSuppressionHoldTicks != this.suppressionHoldTicks || previousUnconsciousTicks != this.unconsciousTicks || previousCriticalCondition != this.criticalConditionActive || previousGiveUpState != this.unconsciousAllowsGiveUp || previousDeathState != this.unconsciousCausesDeath || !Objects.equals(previousUnconsciousReasonKey, this.unconsciousReasonKey)) {
+        if (previousPainLevel != this.painLevel
+            || previousAdrenalineLevel != this.adrenalineLevel
+            || previousAdrenalineTicks != this.adrenalineTicks
+            || Float.compare(previousSuppressionIntensity, this.suppressionIntensity) != 0
+            || previousSuppressionHoldTicks != this.suppressionHoldTicks
+            || previousUnconsciousTicks != this.unconsciousTicks
+            || previousCriticalCondition != this.criticalConditionActive
+            || previousGiveUpState != this.unconsciousAllowsGiveUp
+            || previousDeathState != this.unconsciousCausesDeath
+            || !Objects.equals(previousUnconsciousReasonKey, this.unconsciousReasonKey)
+            || Float.compare(previousAcute, this.acutePainIntensity) != 0
+            || previousRush != this.morphineRushTicks) {
             this.scheduleResync();
         }
         if (this.painLevel == 0 && this.adrenalineTicks == 0 && this.unconsciousTicks == 0 && !this.isPainSuppressed(player)) {
@@ -1326,8 +1547,24 @@ implements LookupReloadListener {
     }
 
     private int calculatePainLevel() {
-        boolean hasInjury = false;
+        int fullyLostParts = this.countFullyLostParts();
+        this.chronicPainIntensity = this.calculateChronicIntensity();
+        float effective = Math.min(PAIN_HARD_CAP, this.chronicPainIntensity + this.acutePainIntensity);
+        return this.mapEffectiveToPainLevel(effective, fullyLostParts);
+    }
+
+    private int countFullyLostParts() {
         int fullyLostParts = 0;
+        for (AbstractDamageablePart part : this) {
+            if (CommonUtils.getVisualHealth(part) <= 0.0f && CommonUtils.getVisibleMissingHealth(part) > 0.0f) {
+                ++fullyLostParts;
+            }
+        }
+        return fullyLostParts;
+    }
+
+    private float calculateChronicIntensity() {
+        boolean hasInjury = false;
         float maxSeverity = 0.0f;
         float weightedSeverity = 0.0f;
         float totalWeight = 0.0f;
@@ -1336,10 +1573,9 @@ implements LookupReloadListener {
             float missingHealth = CommonUtils.getVisibleMissingHealth(part);
             if (missingHealth <= 0.0f) continue;
             hasInjury = true;
-            float injuryRatio = missingHealth / (float)part.getMaxHealth();
+            float injuryRatio = missingHealth / (float) part.getMaxHealth();
             if (visualHealth <= 0.0f) {
-                ++fullyLostParts;
-                float f = injuryRatio = part.canCauseDeath ? 1.0f : 0.85f;
+                injuryRatio = part.canCauseDeath ? 1.0f : 0.85f;
             }
             if (part.canCauseDeath && injuryRatio >= 0.55f) {
                 injuryRatio = Math.min(1.0f, injuryRatio + 0.15f);
@@ -1350,16 +1586,34 @@ implements LookupReloadListener {
             totalWeight += weight;
         }
         if (!hasInjury) {
+            return 0.0f;
+        }
+        float averageSeverity = totalWeight <= 0.0f ? 0.0f : weightedSeverity / totalWeight;
+        // Soften low-end injury; keep multi-part critical near soft cap.
+        float combinedSeverity = Math.min(1.0f, maxSeverity * 0.55f + averageSeverity * 0.45f);
+        return Mth.clamp((float) Math.pow(combinedSeverity, CHRONIC_POWER) * CHRONIC_SCALE, 0.0f, CHRONIC_SOFT_CAP);
+    }
+
+    private int mapEffectiveToPainLevel(float effective, int fullyLostParts) {
+        if (effective <= 0.0f && fullyLostParts <= 0 && this.chronicPainIntensity <= 0.0f && this.acutePainIntensity <= 0.0f) {
             return 0;
         }
-        // Always scale by injury severity (static "always mild" mode was confusing in practice).
-        float averageSeverity = totalWeight <= 0.0f ? 0.0f : weightedSeverity / totalWeight;
-        float combinedSeverity = Math.min(1.0f, maxSeverity * 0.65f + averageSeverity * 0.35f);
-        int painLevel = Math.max(1, Math.min(5, 1 + (int)Math.floor(combinedSeverity * 4.9999f)));
-        if (fullyLostParts < 3 && painLevel >= 5) {
+        if (fullyLostParts >= 3 || effective > 0.82f) {
+            return 5;
+        }
+        if (effective > 0.58f) {
             return 4;
         }
-        return painLevel;
+        if (effective > 0.36f) {
+            return 3;
+        }
+        if (effective > 0.18f) {
+            return 2;
+        }
+        if (effective > 0.0f || this.chronicPainIntensity > 0.0f || this.acutePainIntensity > 0.0f) {
+            return 1;
+        }
+        return 0;
     }
 
     private int calculateAdrenalineLevel(int ticks) {

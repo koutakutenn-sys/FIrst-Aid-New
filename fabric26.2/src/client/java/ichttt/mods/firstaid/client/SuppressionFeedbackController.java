@@ -30,10 +30,12 @@ public final class SuppressionFeedbackController {
    private static final Identifier HEARTBEAT_SOUND = Identifier.fromNamespaceAndPath("firstaid", "debuff.heartbeat");
    private static final Set<Identifier> INTERNAL_SOUNDS = Set.of(TINNITUS_SOUND, HEARTBEAT_SOUND);
    private static final float PAIN_FOV_MAX_REDUCTION = 12.0F;
-   private static final float PAIN_FOV_GAIN = 0.18F;
-   private static final float PAIN_FOV_DECAY = 0.04F;
+    private static final float PAIN_FOV_HARD_MAX_REDUCTION = 22.0F;
+   private static final float PAIN_FOV_GAIN = 0.22F;
+   private static final float PAIN_FOV_DECAY = 0.05F;
    private static final float SUPPRESSION_FOV_MIN = 30.0F;
    private static final int SEVERE_PAIN_LEVEL = 4;
+   private static final float ACUTE_TINNITUS_THRESHOLD = 0.85F;
    private static final int SEVERE_PAIN_SOUND_COOLDOWN_TICKS = 60;
 
    /**
@@ -85,7 +87,8 @@ public final class SuppressionFeedbackController {
    private float fovImpulse;
    private long soundCooldownUntilGameTime;
    private int lastPainLevel;
-    private int hallucinationCooldownTicks;
+   private float lastAcutePain;
+   private int hallucinationCooldownTicks;
    @Nullable
    private Level trackedLevel;
 
@@ -100,15 +103,24 @@ public final class SuppressionFeedbackController {
 
          PlayerDamageModel playerDamageModel = CommonUtils.getDamageModel(player) instanceof PlayerDamageModel model ? model : null;
          int painLevel = playerDamageModel == null ? 0 : playerDamageModel.getPainLevel();
+        float acutePain = playerDamageModel == null ? 0.0F : playerDamageModel.getAcutePainIntensity();
          float suppressionScale = FirstAid.lowSuppressionEnabled ? FirstAid.lowSuppressionMultiplier : 1.0F;
          this.suppressionIntensity = (playerDamageModel == null ? 0.0F : playerDamageModel.getSuppressionIntensity()) * suppressionScale;
          this.holdTicks = playerDamageModel == null ? 0 : playerDamageModel.getSuppressionHoldTicks();
          boolean withdrawalActive = playerDamageModel != null && playerDamageModel.isWithdrawalEpisodeActive();
          float addictionNorm = playerDamageModel == null ? 0.0F : playerDamageModel.getAddictionNormalized();
-         boolean painSuppressed = player.hasEffect(RegistryObjects.PAINKILLER_EFFECT);
-         float targetPainFov = !painSuppressed && playerDamageModel != null && FirstAid.enablePainFovCompression
-            ? playerDamageModel.getPainVisualStrength() * 12.0F
-            : 0.0F;
+         boolean painSuppressed = player.hasEffect(RegistryObjects.PAINKILLER_EFFECT)
+            || player.hasEffect(RegistryObjects.MORPHINE_EFFECT);
+         float targetPainFov = 0.0F;
+         if (playerDamageModel != null && FirstAid.enablePainFovCompression) {
+            float visual = playerDamageModel.getPainVisualStrength(painSuppressed);
+            if (visual > 0.01F) {
+               float soft = Mth.clamp(visual, 0.0F, 1.0F) * PAIN_FOV_MAX_REDUCTION;
+               float hardExtra = Math.max(0.0F, visual - 1.0F) / (PlayerDamageModel.PAIN_HARD_CAP - 1.0F)
+                  * (PAIN_FOV_HARD_MAX_REDUCTION - PAIN_FOV_MAX_REDUCTION);
+               targetPainFov = soft + hardExtra;
+            }
+         }
          boolean holding = this.holdTicks > 0;
          float targetMuffle = holding ? Math.max(0.35F, this.suppressionIntensity * 0.55F) : this.suppressionIntensity * 0.42F;
          float targetMusicDetune = 0.0F;
@@ -140,12 +152,18 @@ public final class SuppressionFeedbackController {
             } else if (FirstAid.enablePainAudioEffects && painLevel >= 4 && this.lastPainLevel < 4) {
                this.soundCooldownUntilGameTime = level.getGameTime() + 60L;
                this.playTinnitusSound(0.52F + 0.12F * Math.min(2, painLevel - 4));
+            } else if (FirstAid.enablePainAudioEffects
+               && acutePain >= ACUTE_TINNITUS_THRESHOLD
+               && this.lastAcutePain < ACUTE_TINNITUS_THRESHOLD) {
+               this.soundCooldownUntilGameTime = level.getGameTime() + 60L;
+               this.playTinnitusSound(0.48F + 0.18F * Mth.clamp(acutePain - ACUTE_TINNITUS_THRESHOLD, 0.0F, 1.0F));
             }
          }
 
          this.tickWithdrawalHallucinations(player, level, withdrawalActive, addictionNorm);
 
          this.lastPainLevel = painLevel;
+         this.lastAcutePain = acutePain;
       } else {
          this.clear(level);
       }
