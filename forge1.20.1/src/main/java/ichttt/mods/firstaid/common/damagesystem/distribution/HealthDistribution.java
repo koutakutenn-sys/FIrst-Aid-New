@@ -19,6 +19,7 @@
 package ichttt.mods.firstaid.common.damagesystem.distribution;
 
 import ichttt.mods.firstaid.FirstAid;
+import ichttt.mods.firstaid.FirstAidConfig;
 import ichttt.mods.firstaid.api.damagesystem.AbstractDamageablePart;
 import ichttt.mods.firstaid.api.damagesystem.AbstractPlayerDamageModel;
 import ichttt.mods.firstaid.api.enums.EnumPlayerPart;
@@ -135,6 +136,17 @@ public class HealthDistribution {
             }
             CommonUtils.syncDamageModel((ServerPlayer) player);
         }
+    }
+
+    public static boolean canApplyNaturalRegen(Player player) {
+        if (!FirstAidConfig.SERVER.allowOtherHealingItems.get()) {
+            return false;
+        }
+        if (FirstAidConfig.SERVER.naturalRegenMultiplier.get() <= 0.0D) {
+            return false;
+        }
+        AbstractPlayerDamageModel model = CommonUtils.getDamageModel(player);
+        return model != null && canApplyNaturalRegen(model);
     }
 
     public static boolean canApplyNaturalRegen(AbstractPlayerDamageModel damageModel) {

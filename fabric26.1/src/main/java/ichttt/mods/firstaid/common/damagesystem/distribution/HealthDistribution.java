@@ -124,6 +124,17 @@ public class HealthDistribution {
       }
    }
 
+   public static boolean canApplyNaturalRegen(Player player) {
+      if (!FirstAidConfig.SERVER.allowOtherHealingItems.get()) {
+         return false;
+      }
+      if (FirstAidConfig.SERVER.naturalRegenMultiplier.get() <= 0.0) {
+         return false;
+      }
+      AbstractPlayerDamageModel model = CommonUtils.getDamageModel(player);
+      return model != null && canApplyNaturalRegen(model);
+   }
+
    public static boolean canApplyNaturalRegen(AbstractPlayerDamageModel damageModel) {
       return FirstAid.naturalRegenMode != FirstAid.NaturalRegenMode.OFF && selectNaturalRegenTarget(damageModel) != null;
    }
