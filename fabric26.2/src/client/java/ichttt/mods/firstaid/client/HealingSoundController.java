@@ -73,7 +73,10 @@ public final class HealingSoundController {
    }
 
    public static void clear() {
-      SoundManager soundManager = Minecraft.getInstance().getSoundManager();
+      clear(Minecraft.getInstance().getSoundManager());
+   }
+
+   public static void clear(SoundManager soundManager) {
       stopMedicineSounds(soundManager);
       stopHealingSound(soundManager);
       stopRescueInteractionSound(soundManager);
@@ -139,7 +142,7 @@ public final class HealingSoundController {
 
          SoundEvent loopSound = itemMedicine.getUseLoopSound(useStack);
          if (loopSound != null) {
-            if (activeMedicineLoopSound == null || !activeMedicineLoopSound.matches(player, useStack)) {
+            if (activeMedicineLoopSound == null || activeMedicineLoopSound.isStopped() || !activeMedicineLoopSound.matches(player, useStack)) {
                stopMedicineLoopSound(soundManager);
                activeMedicineLoopSound = new HealingSoundController.ItemUseSound(player, useStack.copyWithCount(1), loopSound);
                soundManager.play(activeMedicineLoopSound);
@@ -170,6 +173,7 @@ public final class HealingSoundController {
       if (activeMedicineLoopSound != null) {
          activeMedicineLoopSound.stop();
          soundManager.stop(activeMedicineLoopSound);
+         soundManager.stop(activeMedicineLoopSound.getIdentifier(), SoundSource.PLAYERS);
          activeMedicineLoopSound = null;
       }
    }
@@ -178,11 +182,12 @@ public final class HealingSoundController {
       if (activeHealingSound != null) {
          activeHealingSound.stop();
          soundManager.stop(activeHealingSound);
+         soundManager.stop(activeHealingSound.getIdentifier(), SoundSource.PLAYERS);
          activeHealingSound = null;
       }
    }
 
-   private static final class ItemUseSound implements TickableSoundInstance {
+   static final class ItemUseSound implements TickableSoundInstance {
       private final LocalPlayer player;
       private final ItemStack stack;
       private final Identifier location;

@@ -255,8 +255,9 @@ public final class SuppressionFeedbackController {
 
    @Nullable
    public SoundInstance maybeMuffle(@Nullable SoundInstance original) {
+      // Keep use sounds tickable so SoundEngine can stop them when item use ends.
       if (!(Boolean)FirstAidConfig.CLIENT.enableSounds.get() || original == null
-            || original instanceof SuppressionFeedbackController.MuffledSoundInstance) {
+            || original instanceof SuppressionFeedbackController.MuffledSoundInstance || original instanceof HealingSoundController.ItemUseSound) {
          return original;
       }
       Identifier soundId = original.getIdentifier();

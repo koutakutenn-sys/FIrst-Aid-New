@@ -87,6 +87,7 @@ public final class ClientEventHandler {
 
    private static void clientTick(Minecraft mc) {
       if (mc.level == null || mc.player == null || mc.player.connection == null) {
+         HealingSoundController.clear();
          resetGiveUpHoldState();
          clearPendingHealingSelection();
          requireUseReleaseBeforeHealingSelection = false;
