@@ -10,6 +10,7 @@ import ichttt.mods.firstaid.common.util.CommonUtils;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectCategory;
@@ -42,7 +43,14 @@ public class PotionPoisonPatched extends MobEffect {
             if (playerDamageModel == null) {
                return false;
             } else {
-               DamageDistribution.handleDamageTaken(POISON_DISTRIBUTION, playerDamageModel, 1.0F, player, magicDamage, true, false);
+               float left = DamageDistribution.handleDamageTaken(POISON_DISTRIBUTION, playerDamageModel, 1.0F, player, magicDamage, true, false);
+               // Poison damage is applied here instead of through vanilla hurt(), so the hurt sound has to be
+               // played explicitly. A leftover of the full 1.0F means every body part was already at its 30%
+               // floor and the hit was fully absorbed, so nothing is played in that case.
+               if (left != 1.0F) {
+                  player.level()
+                     .playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PLAYER_HURT, player.getSoundSource(), 1.0F, 1.0F);
+               }
                return true;
             }
          } else {

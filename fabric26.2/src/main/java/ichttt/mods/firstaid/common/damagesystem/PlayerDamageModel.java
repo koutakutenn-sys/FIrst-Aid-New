@@ -68,6 +68,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -230,6 +231,11 @@ implements LookupReloadListener {
     /** Monotonic cue id so clients play tinnitus once per event. */
     private int tinnitusCueId = 0;
     private float tinnitusCueSeverity = 0.0f;
+    private boolean poisonTinnitusCued = false;
+    private boolean witherTinnitusCued = false;
+    /** Whether a poison/wither effect is currently applied, used to detect the onset of the effect. */
+    private boolean poisonEffectActive = false;
+    private boolean witherEffectActive = false;
     /** After rescue/respawn, suppress feedback audio until this reaches 0. */
     private int audioMuteTicks = 0;
 
@@ -1088,7 +1094,8 @@ implements LookupReloadListener {
     }
 
     /**
-     * After damage is applied, register tinnitus only for explosions, head trauma, or very strong shocks.
+     * After damage is applied, register tinnitus for explosions, head trauma, very strong shocks and for
+     * poison/wither damage, which never reaches those thresholds (see the damage-over-time branch below).
      */
     public void registerDamageFeedback(Player player, DamageSource source, AbstractPlayerDamageModel before) {
         if (player.level().isClientSide() || before == null || this.audioMuteTicks > 0) {
@@ -1102,7 +1109,26 @@ implements LookupReloadListener {
                 totalLost += Math.max(0.0f, previous.currentHealth - part.currentHealth);
             }
         }
-        if (totalLost <= 0.05f) {
+        boolean dealtRealDamage = totalLost > 0.05f;
+        // Poison and wither only tick for 1 damage at a time, so they never reach the acute trauma
+        // thresholds below. They ring at effect start (see tickDotTinnitusState) and again whenever real
+        // damage resumes after the body parts sat at their floor: a fully absorbed tick re-arms the cue.
+        boolean poisonTick = source.is(DamageTypes.MAGIC) && source.getEntity() == null
+            && source.getDirectEntity() == null && player.hasEffect(MobEffects.POISON);
+        boolean witherTick = source.is(DamageTypes.WITHER);
+        if (poisonTick || witherTick) {
+
+            if (poisonTick && !this.poisonTinnitusCued) {
+                this.poisonTinnitusCued = true;
+                this.registerTinnitusCue(0.45f);
+            } else if (witherTick && !this.witherTinnitusCued) {
+                this.witherTinnitusCued = true;
+                this.registerTinnitusCue(0.45f);
+            }
+            return;
+        }
+
+        if (!dealtRealDamage) {
             return;
         }
         boolean explosion = source.is(net.minecraft.tags.DamageTypeTags.IS_EXPLOSION);
@@ -1118,6 +1144,39 @@ implements LookupReloadListener {
         // Sudden strong full-body shock (~3+ hearts in one hit).
         if (totalLost >= 6.0f) {
             this.registerTinnitusCue(Mth.clamp(0.52f + (totalLost - 6.0f) * 0.04f, 0.52f, 1.0f));
+        }
+    }
+
+    /**
+     * Poison and wither damage is applied by First Aid itself instead of vanilla {@code hurt()}, so it never
+     * reaches the acute trauma thresholds in {@link #registerDamageFeedback}. Ring as soon as the effect shows
+     * up, instead of waiting for the first damage tick (up to 25 ticks later), and reset once the effect is
+     * gone so a later poisoning rings again. While the player is muted the flag stays unset and the next
+     * damage tick takes over; ticks that are fully absorbed re-arm the cue for the next real damage tick.
+     */
+    private void tickDotTinnitusState(Player player) {
+        boolean poisoned = player.hasEffect(MobEffects.POISON);
+        if (!poisoned) {
+            this.poisonEffectActive = false;
+            this.poisonTinnitusCued = false;
+        } else if (!this.poisonEffectActive) {
+            this.poisonEffectActive = true;
+            if (this.audioMuteTicks <= 0) {
+                this.poisonTinnitusCued = true;
+                this.registerTinnitusCue(0.45f);
+            }
+        }
+
+        boolean withering = player.hasEffect(MobEffects.WITHER);
+        if (!withering) {
+            this.witherEffectActive = false;
+            this.witherTinnitusCued = false;
+        } else if (!this.witherEffectActive) {
+            this.witherEffectActive = true;
+            if (this.audioMuteTicks <= 0) {
+                this.witherTinnitusCued = true;
+                this.registerTinnitusCue(0.45f);
+            }
         }
     }
 
@@ -1516,6 +1575,9 @@ implements LookupReloadListener {
     }
 
     private void updateMedicalState(Player player) {
+        if (!player.level().isClientSide()) {
+            this.tickDotTinnitusState(player);
+        }
         boolean previousUnconsciousState = this.isUnconscious();
         int previousPainLevel = this.painLevel;
         int previousAdrenalineLevel = this.adrenalineLevel;
